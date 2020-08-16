@@ -11,8 +11,9 @@ _KEYS_DIR = os.path.join(_BASE_DIR, 'api_keys')
 _PROVIDERS = dict({'football_data' : 'http://api.football-data.org/v2/',
                    'rapid_football' : 'https://api-football-v1.p.rapidapi.com/v2/'})
 
-focus_source = 'rapid_football'
-
+# focus_source = 'rapid_football'
+# https://rapidapi.com/api-sports/api/api-football/details
+# https://rapidapi.com/api-sports/api/api-football/tutorials/how-to-use-the-api-football-api-with-python
 
 def main(focus_source, req_params):
 
@@ -30,11 +31,21 @@ def main(focus_source, req_params):
 
     # get all team_id (for a league_id)
     search_params = dict({'league_id' : seriea_id})
-    search_type = 'league_id'
+    search_type = 'team_id'
     search_target = None
     teams_data = wrap_api_request(focus_source, req_headers, search_params,
                                    search_type, search_target)
+
     # get all fixture_id (for a league_id)
+    fixture_data = dict()
+    for t in teams_data:
+        # t = teams_data[0]
+        search_params = dict({'league_id' : seriea_id, 'team_id' : t['team_id']})
+        search_type = 'fixture_id'
+        search_target = None
+        fixture_data[t['team_id']] = wrap_api_request(focus_source, req_headers,
+                                                      search_params, search_type,
+                                                      search_target)
 
     # get all statistics for a fixture_id
 
@@ -57,19 +68,23 @@ def get_api_creds(focus_source):
     return api_key
 
 
-def wrap_api_request(focus_source, req_headers, search_params, search_type, search_target):
+def wrap_api_request(focus_source, req_headers, search_params, search_type, search_target=None):
 
-    filename = focus_source + '_' + search_target.replace(' ', '').lower() + '_' + str(search_params['season']) + '.json'
+    filename = search_type.replace('_', '').lower() + '__'
+
+    # unpacking the search_params
+    for k in search_params:
+        filename = filename + k.replace('_', '').lower() + '-' + str(search_params[k]) + '_'
+    filename = filename + '.json'
+
     if filename not in os.listdir(_DATA_DIR):
-        seriea_req = send_request(focus_source, search_params,
-                                  search_type='league_id')
-        seriea_data = read_request_data(req = seriea_req, search_type='league_id', search_target='Serie A')
-        # seriea_data = final_data
-        with open(os.path.join(_DATA_DIR, filename), 'w') as outfile:
-            json.dump(seriea_data, outfile)
+        req = send_request(focus_source, search_params, search_type)
+        data = read_request_data(req, search_type, search_target)
+        with open(os.path.join(_DATA_DIR, focus_source, filename), 'w') as outfile:
+            json.dump(data, outfile)
     else:
-        with open(os.path.join(_DATA_DIR, filename), 'r') as inputfile:
-            seriea_data = json.load(inputfile)
+        with open(os.path.join(_DATA_DIR, focus_source, filename), 'r') as inputfile:
+            data = json.load(inputfile)
     return data
 
 
@@ -88,7 +103,7 @@ def build_request_url(focus_source, search_params, search_type):
     search_type_list = dict({
     'league_id' : 'leagues/country/%%code%%/%%season%%',
     'team_id' : 'teams/league/%%league_id%%',
-    'fixture_id' : 'fixtures/team/%%team_id%%/%%league_id%%?timezone=%%timezone%%"',
+    'fixture_id' : 'fixtures/team/%%team_id%%/%%league_id%%"',
     'player_id' : 'players/fixture/%%fixture_id%%'
     })
 
@@ -98,7 +113,7 @@ def build_request_url(focus_source, search_params, search_type):
     url = main_url + search_type_list[search_type]
     for k in search_params.keys():
         target = '%%'+k+'%%'
-        url = final_url.replace(target, str(search_params[k]))
+        url = url.replace(target, str(search_params[k]))
 
     return url
 
@@ -107,6 +122,7 @@ def send_request(focus_source, search_params, search_type):
 
     # construct the url with the parameters passsed
     url = build_request_url(focus_source, search_params, search_type)
+    print(url)
     # get request
     req = requests.get(url, headers = req_headers)
     # safety checks
@@ -131,7 +147,6 @@ def read_request_data(req, search_type, search_target = None):
     final_data = []
 
     for d in raw_data['api'][extract_focus]:
-        print(d[search_type])
         # todo(Michele): verify that this "name" convention is valid across search_targets
         if search_target is None:
             # adding all the results from the call
