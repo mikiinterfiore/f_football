@@ -1,9 +1,5 @@
 import os
 import sys
-
-# import pandas as pd
-# import numpy as np
-
 import requests
 import json
 
@@ -15,18 +11,33 @@ _KEYS_DIR = os.path.join(_BASE_DIR, 'api_keys')
 _PROVIDERS = dict({'football_data' : 'http://api.football-data.org/v2/',
                    'rapid_football' : 'https://api-football-v1.p.rapidapi.com/v2/'})
 
-
 focus_source = 'rapid_football'
 
 
 def main(focus_source, req_params):
+
     api_key = get_api_creds(focus_source)
     req_headers = dict({'X-RapidAPI-Key' : api_key,
                         'X-RapidAPI-host' : 'api-football-v1.p.rapidapi.com'})
-    # sending the request to the API
-    req = send_request(focus_source, req_params, req_headers)
-    # extracting the data
-    data = read_request_data(req)
+
+    # get Serie A league_id
+    search_params = dict({'code' : 'IT', 'season' : 2019})
+    search_type='league_id'
+    search_target='Serie A'
+    seriea_data = wrap_api_request(focus_source, req_headers, search_params,
+                                   search_type, search_target)
+    seriea_id = seriea_data[0]['league_id']
+
+    # get all team_id (for a league_id)
+    search_params = dict({'league_id' : seriea_id})
+    search_type = 'league_id'
+    search_target = None
+    teams_data = wrap_api_request(focus_source, req_headers, search_params,
+                                   search_type, search_target)
+    # get all fixture_id (for a league_id)
+
+    # get all statistics for a fixture_id
+
     return None
 
 
@@ -34,7 +45,7 @@ def get_api_creds(focus_source):
 
     # check that the source is existing
     if focus_source not in list(_PROVIDERS.keys()):
-        sys.exit("You can not have three process at the same time.")
+        sys.exit("The requested source API is not available. Please review.")
 
     # selecting the right file
     all_files = os.listdir(_KEYS_DIR)
@@ -46,12 +57,25 @@ def get_api_creds(focus_source):
     return api_key
 
 
-def build_request_url(focus_source, search_params):
+def wrap_api_request(focus_source, req_headers, search_params, search_type, search_target):
+
+    filename = focus_source + '_' + search_target.replace(' ', '').lower() + '_' + str(search_params['season']) + '.json'
+    if filename not in os.listdir(_DATA_DIR):
+        seriea_req = send_request(focus_source, search_params,
+                                  search_type='league_id')
+        seriea_data = read_request_data(req = seriea_req, search_type='league_id', search_target='Serie A')
+        # seriea_data = final_data
+        with open(os.path.join(_DATA_DIR, filename), 'w') as outfile:
+            json.dump(seriea_data, outfile)
+    else:
+        with open(os.path.join(_DATA_DIR, filename), 'r') as inputfile:
+            seriea_data = json.load(inputfile)
+    return data
+
+
+def build_request_url(focus_source, search_params, search_type):
 
     main_url = _PROVIDERS[focus_source]
-
-    # working only with Serie A right now : each season has a different league_id
-    # so we have to iterate if we want to go back in time
 
     # CORE ELEMENTS TO USE :
     # country / code = where
@@ -61,61 +85,29 @@ def build_request_url(focus_source, search_params):
     # fixture_id = unique for every match
     # player_id = unique across career
 
-    search_params = dict({'code' : 'IT',
-                          'country' : 'Italy',
-                          'league_id' : ,
-                          'season' : 2019,
-                          'team_id' : ,
-                          'end_date' : ,
-                          'timezone' : 'Europe/London',
-                          'number' : 3, # past / upcoming number of matches
-                          'fixture_id' : , # single game id!
-                          'player_id' : })
+    search_type_list = dict({
+    'league_id' : 'leagues/country/%%code%%/%%season%%',
+    'team_id' : 'teams/league/%%league_id%%',
+    'fixture_id' : 'fixtures/team/%%team_id%%/%%league_id%%?timezone=%%timezone%%"',
+    'player_id' : 'players/fixture/%%fixture_id%%'
+    })
 
-    # searching leagues
-    'leagues/league/{%%league_id%%}'
-    'leagues/seasonsAvailable/{%%league_id%%}'
-    'leagues/team/{%%team_id%%}'
-    'leagues/country/{%%country%%}'
-    'leagues/country/{%%code%%}'
-    'leagues/country/{%%code%%}/{%%season%%}'
-    'leagues/country/{%%country%%}/{%%season%%}'
-    # searching teams
-    'teams/team/{%%team_id%%}'
-    'teams/league/{%%league_id%%}'
-    # searching stats
-    'statistics/{%%league_id%%}/{%team_id%}'
-    'statistics/{%%league_id%%}/{%team_id%}/{%%end_date%%}'
-    # searching standings is not point in time, just latest available
-    # searching fixtures :
-    'fixtures/rounds/{%league_id%}'
-    'fixtures/team/{%%team_id%%}/{%%league_id%%}?timezone=%%timezone%%"'
-    'fixtures/team/{%%team_id%%}/next/{%%number%%}?timezone=%%timezone%%' # not restricted to league_id
-    'fixtures/team/{%%team_id%%}/last/{%%number%%}?timezone=%%timezone%%' # not restricted to league_id
-    # searching stats by fixtures : REVIEW!
-    'statistics/fixture/{%%fixture_id%%}'
-    # searcing events
-    'events/fixture/{%%fixture_id%%}'
-    # searching lineups
-    'lineups/{%%fixture_id%%}'
-    # searching players
-    'players/seasons'
-    'players/player/{%%player_id%%}'
-    'players/player/{%%player_id%%}/{%%season%%}'
-    'players/fixture/{%%fixture_id%%}'
+    if search_type not in list(search_type_list.keys()):
+        sys.exit('API calls for %s not currently available in the code.' % (search_type))
+
+    url = main_url + search_type_list[search_type]
+    for k in search_params.keys():
+        target = '%%'+k+'%%'
+        url = final_url.replace(target, str(search_params[k]))
+
+    return url
 
 
+def send_request(focus_source, search_params, search_type):
 
-
-    final_url = main_url
-
-
-    return final_url
-
-
-
-def send_request(focus_source, search_params):
-
+    # construct the url with the parameters passsed
+    url = build_request_url(focus_source, search_params, search_type)
+    # get request
     req = requests.get(url, headers = req_headers)
     # safety checks
     status_code = req.status_code
@@ -131,7 +123,21 @@ def send_request(focus_source, search_params):
         sys.exit('You have exceeded your allowed requests per minute/day')
 
 
-def read_request_data(req):
-    all_competitions = json.loads(req.text)
-    # serie_a = [x for x in all_competitions['competitions'] if x['name']=='Serie A'][0]
-    # serie_a['code']
+def read_request_data(req, search_type, search_target = None):
+
+    raw_data = json.loads(req.text)
+    extract_focus = list(raw_data['api'].keys())[1]
+
+    final_data = []
+
+    for d in raw_data['api'][extract_focus]:
+        print(d[search_type])
+        # todo(Michele): verify that this "name" convention is valid across search_targets
+        if search_target is None:
+            # adding all the results from the call
+            final_data.append(d)
+        else:
+            if d['name'] == search_target:
+                final_data.append(d)
+
+    return final_data
