@@ -12,6 +12,7 @@ _PROVIDERS = dict({'football_data' : 'http://api.football-data.org/v2/',
                    'rapid_football' : 'https://api-football-v1.p.rapidapi.com/v2/'})
 
 # focus_source = 'rapid_football'
+# DETAILS FREE PLAN: 100/day requests MAX, 30/min requests MAX
 # https://rapidapi.com/api-sports/api/api-football/details
 # https://rapidapi.com/api-sports/api/api-football/tutorials/how-to-use-the-api-football-api-with-python
 
@@ -40,14 +41,30 @@ def main(focus_source, req_params):
     fixture_data = dict()
     for t in teams_data:
         # t = teams_data[0]
+        # print(t)
         search_params = dict({'league_id' : seriea_id, 'team_id' : t['team_id']})
         search_type = 'fixture_id'
         search_target = None
         fixture_data[t['team_id']] = wrap_api_request(focus_source, req_headers,
                                                       search_params, search_type,
                                                       search_target)
-
     # get all statistics for a fixture_id
+    stats_fixt = dict()
+    for team in list(fixture_data.keys())[4:9]:
+        # team = list(fixture_data.keys())[0]
+        stats_fixt[team] = dict()
+        for game in fixture_data[team]:
+            # game = fixture_data[team][0]
+            fixture_focus = game['fixture_id']
+            search_params = dict({'fixture_id' : fixture_focus})
+            search_type = 'statistics_fixture'
+            search_target = None
+            stats_fixt[team][fixture_focus] = wrap_api_request(focus_source,
+                                                               req_headers,
+                                                               search_params,
+                                                               search_type,
+                                                               search_target)
+
 
     return None
 
@@ -70,13 +87,11 @@ def get_api_creds(focus_source):
 
 def wrap_api_request(focus_source, req_headers, search_params, search_type, search_target=None):
 
-    filename = search_type.replace('_', '').lower() + '__'
-
+    filename = search_type.replace('_', '').lower() + '/'
     # unpacking the search_params
     for k in search_params:
         filename = filename + k.replace('_', '').lower() + '-' + str(search_params[k]) + '_'
     filename = filename + '.json'
-
     if filename not in os.listdir(_DATA_DIR):
         req = send_request(focus_source, search_params, search_type)
         data = read_request_data(req, search_type, search_target)
@@ -103,8 +118,9 @@ def build_request_url(focus_source, search_params, search_type):
     search_type_list = dict({
     'league_id' : 'leagues/country/%%code%%/%%season%%',
     'team_id' : 'teams/league/%%league_id%%',
-    'fixture_id' : 'fixtures/team/%%team_id%%/%%league_id%%"',
-    'player_id' : 'players/fixture/%%fixture_id%%'
+    'fixture_id' : 'fixtures/team/%%team_id%%/%%league_id%%?timezone=Europe/London',
+    'player_id' : 'players/fixture/%%fixture_id%%',
+    'statistics_fixture' :'/statistics/fixture/%%fixture_id%%'
     })
 
     if search_type not in list(search_type_list.keys()):
