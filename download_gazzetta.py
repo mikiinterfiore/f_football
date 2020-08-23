@@ -43,10 +43,10 @@ def main():
         }
     s.cookies.set(**gaz_cookie)
 
-    for season in [2019]: #[2019, 2018, 2017]:
-        # season = 2019
+    for season in [2019, 2018, 2017]:
+        # season = 2018
         for matchday in range(1, 39):
-            # matchday = 38
+            # matchday = 1
             time.sleep(random.randint(15, 35))
             req = send_gaz_request(s, season, matchday)
             fv_df = extract_gaz_data(req)
@@ -113,12 +113,10 @@ def extract_gaz_data(req):
 
     voti_squadre = soup.find_all('ul', attrs={'class': 'magicTeamList'})
     for vs in voti_squadre[0:20]:
-        # vs = voti_squadre[0]
         nome_squadra = vs.find('span', attrs={'class': 'teamNameIn'}).text
         voti_giocatori = vs.find_all('li')
         # first list component is the header of the table so we skip
         for vg in voti_giocatori[1:]:
-            # vg = voti_giocatori[1]
             player, role = extract_html_player_info(vg)
             stats = extract_html_player_stats(vg)
             new_row = {'team' : nome_squadra,
@@ -179,13 +177,25 @@ def find_html_player_data(tag):
 
 
 def extract_html_player_info(vg):
+
     # vg is the HTML tree containing the player informations
     player = vg.find('span', attrs={'class': 'playerNameIn'}).find('a').get('href')
-    play_str = 'https://www.gazzetta.it/calcio/giocatori/'
-    player = player.replace(play_str, '').split('/')[0].split('-')
+    # print(player)
+    play_str_2019 = 'https://www.gazzetta.it/calcio/giocatori/'
+    play_str_2018 = 'https://www.gazzetta.it/calcio/fantanews/statistiche/'
+    # https://www.gazzetta.it/calcio/fantanews/statistiche/serie-a-2018-19/duvan_zapata_928
+
+    if play_str_2019 in player:
+        player = player.replace(play_str_2019, '').split('/')[0].split('-')
+    elif play_str_2018 in player:
+        player = player.replace(play_str_2018, '').split('/')[1].split('_')[:-1]
+
     if len(player) ==1:
         player = ['', player[0]]
+    elif len(player) >2:
+        player = [player[0], ' '.join(player[1:])]
 
+    print(player)
     role = vg.find('span', attrs={'class': 'playerRole'}).text
 
     return player, role
