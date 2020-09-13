@@ -1,0 +1,13 @@
+Data pipeline and prediction generations: top down explanation
+
+for each player:
+1) find the next game to be played (upcoming fixtures download)
+2) get the player's team statistics up to previous game (historical fixtures download)
+3) get the opponent team statistics up to previous game (historical fixtures download)
+4) get the player's statistics up to previous game (historical player stats download)
+5) get the past fantavoto (gazzetta download)
+6) create the players features (single player stats processing)
+7) create the teams features (single team stats processing)
+8) combine the features based on (1)
+9) (optional) retrain the model
+10) predict next game performance
