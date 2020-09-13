@@ -21,8 +21,27 @@ def main(focus_source = 'rapid_football'):
     fixtures_master.to_csv(master_file, header=True, index=False)
 
     # get the statistics for each fixture
-    fix_stats_cols = ['fixture_id', 'fixture_stat', 'home', 'away']
-    fixtures_stats = pd.DataFrame(columns=fix_stats_cols)
+    fixtures_stats_file = os.path.join(_DATA_DIR, focus_source, 'extracted', 'fixtures_stats.csv')
+    fixtures_stats = get_fixture_stats_data(focus_source, fixtures_stats_file)
+    fixtures_stats = update_fixtures_stats(fixtures_stats, fixtures_master,
+                                           fixtures_stats_file, focus_source)
+    fixtures_stats.to_csv(fixtures_stats_file, header=True, index=False)
+
+
+def get_fixture_stats_data(focus_source, fixtures_stats_file):
+
+    if not os.path.isfile(fixtures_stats_file):
+        fix_stats_cols = ['fixture_id', 'fixture_stat', 'home', 'away']
+        fixtures_stats = pd.DataFrame(columns=fix_stats_cols)
+        fixtures_stats.to_csv(fixtures_stats_file, header=True, index=False)
+
+    fixtures_stats = pd.read_csv(fixtures_stats_file, header=0, index_col=False)
+
+    return fixtures_stats
+
+
+def update_fixtures_stats(fixtures_stats, fixtures_master, fixtures_stats_file, focus_source):
+
     for sf in fixtures_master['fixture_id'].unique():
         sf_file = os.path.join(_DATA_DIR, focus_source, 'statisticsfixture',
                                 'fixtureid-'+str(sf)+'_.json')
@@ -31,6 +50,7 @@ def main(focus_source = 'rapid_football'):
             sf_data['fixture_id'] = sf
             fixtures_stats = fixtures_stats.append(sf_data)
 
+    return fixtures_stats
 
 
 def add_fixture_data(fixtures_master, sf):
@@ -80,7 +100,9 @@ def update_fixture_master(fixtures_master, fixture_dir):
         for sf in raw_data:
             if sf['fixture_id'] not in fixtures_master['fixture_id'].unique():
                 fixtures_master = add_fixture_data(fixtures_master, sf)
+
     # correctly setting the date and time
-    fixtures_master['event_date'] = fixtures_master['event_date'].dt.tz_localize('Europe/London')
+    fixtures_master['event_date'] = pd.to_datetime(fixtures_master['event_date'], utc=True)
+    fixtures_master = fixtures_master.set_index('event_date', drop=True).tz_convert('Europe/London').reset_index()
 
     return fixtures_master
