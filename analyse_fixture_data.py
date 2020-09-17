@@ -50,7 +50,7 @@ def update_fixtures_stats(fixtures_stats, fixtures_master, fixtures_stats_file, 
             sf_data['fixture_id'] = sf
             fixtures_stats = fixtures_stats.append(sf_data)
 
-    return fixtures_stats
+    return fixtures_stats.drop_duplicates()
 
 
 def add_fixture_data(fixtures_master, sf):
@@ -94,6 +94,7 @@ def get_fixture_master(focus_source, master_file):
 def update_fixture_master(fixtures_master, fixture_dir):
 
     all_team_fixtures = os.listdir(fixture_dir)
+    all_team_fixtures = [x for x in all_team_fixtures if x.endswith('.json')]
     for tf in all_team_fixtures:
         with open(os.path.join(fixture_dir, tf), 'r') as inputfile:
             raw_data = json.load(inputfile)

@@ -91,7 +91,7 @@ def prepare_team_stats(fixtures_combo):
                                        'away_team_id','away_team_name',
                                        'fixture_stat','away']]
     away_stats = away_stats.rename(columns={'away_team_id':'team_id', 'away_team_name':'team_name', 'away':'val'})
-    team_fixture_stats = home_stats.append(away_stats).reset_index(drop = True)0
+    team_fixture_stats = home_stats.append(away_stats).reset_index(drop = True)
     team_fixture_stats['event_date'] = pd.to_datetime(team_fixture_stats['event_date'], utc=True).dt.tz_localize(None)
 
     return team_fixture_stats

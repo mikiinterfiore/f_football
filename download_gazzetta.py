@@ -51,7 +51,7 @@ def main():
             req = send_gaz_request(s, season, matchday)
             fv_df = extract_gaz_data(req)
             outfile = 'a' + str(season) + '_m'+ str(matchday) + '.csv'
-            fv_df.to_csv(os.path.join(_DATA_DIR, 'fantavoti', outfile))
+            fv_df.to_csv(os.path.join(_DATA_DIR, 'fantavoti', outfile), header=True, index=False)
 
     return None
 
