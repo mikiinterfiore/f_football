@@ -13,12 +13,12 @@ from utils_rapid_football import *
 _BASE_DIR = '/home/costam/Documents'
 _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 
-# focus_source = 'rapid_football'
+
 # DETAILS FREE PLAN: 100/day requests MAX, 30/min requests MAX
 # https://rapidapi.com/api-sports/api/api-football/details
 # https://rapidapi.com/api-sports/api/api-football/tutorials/how-to-use-the-api-football-api-with-python
 
-def main(focus_source):
+def main(focus_source = 'rapid_football'):
 
     api_key = get_api_creds(focus_source)
     req_headers = dict({'X-RapidAPI-Key' : api_key,
@@ -57,21 +57,22 @@ def main(focus_source):
                                                                        search_target)
     # get all statistics for a fixture_id
     stats_fixt = dict()
-    while day_num_request < 100:
-        for team in list(fixture_data.keys())[0:20]:
-            # team = list(fixture_data.keys())[0]
-            stats_fixt[team] = dict()
-            for game in fixture_data[team]:
-                # 30 requests max / minute
-                time.sleep(random.randint(2, 4))
-                fixture_focus = game['fixture_id']
-                search_params = dict({'fixture_id' : fixture_focus})
-                search_type = 'statistics_fixture'
-                search_target = None
-                stats_fixt[team][fixture_focus], day_num_request = wrap_api_request(day_num_request,
-                                                                                        focus_source,
-                                                                                        req_headers,
-                                                                                        search_params,
-                                                                                        search_type,
-                                                                                        search_target)
+    for team in list(fixture_data.keys())[0:20]:
+        # team = list(fixture_data.keys())[0]
+        stats_fixt[team] = dict()
+        for game in fixture_data[team]:
+            # 30 requests max / minute
+            time.sleep(random.randint(3, 4))
+            fixture_focus = game['fixture_id']
+            search_params = dict({'fixture_id' : fixture_focus})
+            search_type = 'statistics_fixture'
+            search_target = None
+            if day_num_request >= 100:
+                break
+            stats_fixt[team][fixture_focus], day_num_request = wrap_api_request(day_num_request,
+                                                                                    focus_source,
+                                                                                    req_headers,
+                                                                                    search_params,
+                                                                                    search_type,
+                                                                                    search_target)
     return None

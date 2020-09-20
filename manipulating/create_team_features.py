@@ -1,10 +1,6 @@
 import os
-# import sys
-# import json
 import pandas as pd
 import numpy as np
-# import datetime as dt
-# from dateutil import tz
 
 _BASE_DIR = '/home/costam/Documents'
 _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
@@ -22,6 +18,8 @@ def main(focus_source = 'rapid_football'):
     fixtures_combo = combine_fixture_stats(fixtures_stats, goals_stats, fixtures_master)
     team_fixture_stats = prepare_team_stats(fixtures_combo)
     team_fixture_features = compute_fixtures_features(team_fixture_stats)
+    team_feat_file = os.path.join(_DATA_DIR, 'target_features', 'team_features.csv')
+    team_fixture_features.to_csv(team_feat_file, header=True, index=False)
 
     # MODEL FEATURES FOR EACH PLAYER
 
@@ -99,46 +97,75 @@ def prepare_team_stats(fixtures_combo):
 
 def compute_fixtures_features(team_fixture_stats):
 
+    # pre-computation data handling
+    team_fixture_stats.sort_values(by = ['league_id','team_id','event_date','fixture_stat'], inplace = True)
+    team_fixture_stats['val'] = team_fixture_stats['val'].fillna(0)
+
     # rolling calculations for all the statistics except the goals
     stats_idx  = ~team_fixture_stats['fixture_stat'].isin(['ht_goal', 'ft_goal'])
     agg_col = ['team_id', 'team_name', 'fixture_stat']
 
     roll3 = team_fixture_stats.loc[stats_idx].groupby(agg_col)['val'].rolling(window=3, min_periods=2).mean()
-    roll3 = roll3.reset_index().rename(columns = {'level_3' : 'prev_index'})
+    roll3.index.rename('prev_index', level=3, inplace = True)
+    roll3 = roll3.reset_index([0,1,2])
     roll3['feat_type'] = 'm3'
 
-    roll5 = team_fixture_stats.loc[stats_idx].groupby(agg_col).rolling(window=5, min_periods=3).agg({"val": 'mean', "event_date": 'max'})
-    roll5 = roll5.reset_index().rename(columns = {'level_3' : 'prev_index'})
+    roll5 = team_fixture_stats.loc[stats_idx].groupby(agg_col)['val'].rolling(window=5, min_periods=2).mean()
+    roll5.index.rename('prev_index', level=3, inplace = True)
+    roll5 = roll5.reset_index([0,1,2])
     roll5['feat_type'] = 'm5'
 
-    roll10 = team_fixture_stats.loc[stats_idx].groupby(agg_col).rolling(window=10, min_periods=5).agg({"val": "mean", "fixture_id": "tail"})
-    roll10 = roll10.reset_index().rename(columns = {'level_3' : 'prev_index'})
+    roll10 = team_fixture_stats.loc[stats_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=2).mean()
+    roll10.index.rename('prev_index', level=3, inplace = True)
+    roll10 = roll10.reset_index([0,1,2])
     roll10['feat_type'] = 'm10'
 
-    roll10sd = team_fixture_stats.loc[stats_idx].groupby(agg_col).rolling(window=10, min_periods=5).agg({"val": "std", "fixture_id": "tail"})
-    roll10sd = roll10sd.reset_index().rename(columns = {'level_3' : 'prev_index'})
+    roll10sd = team_fixture_stats.loc[stats_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=2).std()
+    roll10sd.index.rename('prev_index', level=3, inplace = True)
+    roll10sd = roll10sd.reset_index([0,1,2])
     roll10sd['feat_type'] = 'sd10'
 
-    team_fixture_features = pd.concat([roll3, roll5, roll10, roll10sd])
+    # adding the half time and full time goal stats
+    gol_s3 = team_fixture_stats.loc[~stats_idx].groupby(agg_col)['val'].rolling(window=3, min_periods=2).sum()
+    gol_s3.index.rename('prev_index', level=3, inplace = True)
+    gol_s3 = gol_s3.reset_index([0,1,2])
+    gol_s3['feat_type'] = 's3'
+
+    gol_s5 = team_fixture_stats.loc[~stats_idx].groupby(agg_col)['val'].rolling(window=5, min_periods=2).sum()
+    gol_s5.index.rename('prev_index', level=3, inplace = True)
+    gol_s5 = gol_s5.reset_index([0,1,2])
+    gol_s5['feat_type'] = 's5'
+
+    gol_s10 = team_fixture_stats.loc[~stats_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=2).sum()
+    gol_s10.index.rename('prev_index', level=3, inplace = True)
+    gol_s10 = gol_s10.reset_index([0,1,2])
+    gol_s10['feat_type'] = 's10'
+
+    gol_sd10 = team_fixture_stats.loc[~stats_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=2).std()
+    gol_sd10.index.rename('prev_index', level=3, inplace = True)
+    gol_sd10 = gol_sd10.reset_index([0,1,2])
+    gol_sd10['feat_type'] = 'sd10'
+
+    team_fixture_features = [roll3, roll5, roll10, roll10sd,
+                             gol_s3, gol_s5, gol_s10, gol_sd10]
+    team_fixture_features = pd.concat(team_fixture_features)
     team_fixture_features['fixture_stat'] = team_fixture_features['fixture_stat'].replace(' ', '_', regex=True).str.lower()
     team_fixture_features['fxtr_feature'] = team_fixture_features['fixture_stat'] + '_' + team_fixture_features['feat_type']
     del team_fixture_features['fixture_stat']
     del team_fixture_features['feat_type']
-    team_fixture_features = team_fixture_features.loc[~team_fixture_features['fixture_id'].isna()]
 
     team_fixture_features = team_fixture_features.merge(team_fixture_stats.loc[:, ['fixture_id','event_date']],
                                                         how='left',
                                                         left_index=True,
                                                         right_index=True)
-
-    pivot_idx = ['fixture_id', 'event_date', 'team_id', 'team_name']
-    test = pd.pivot_table(team_fixture_features.iloc[1:1000], values='val',
-                                           index=pivot_idx,
-                                           columns=['fxtr_feature'],
-                                           aggfunc='count',
-                                           fill_value=None, margins=False,
-                                           dropna=False,
-                                           margins_name='All', observed=False)
-    test = test.reset_index(drop=False)
+    pivot_idx = ['team_id', 'team_name', 'event_date', 'fxtr_feature', 'fixture_id']
+    team_fixture_features = team_fixture_features.sort_values(by=pivot_idx)
+    team_fixture_features = team_fixture_features.set_index(pivot_idx).unstack('fxtr_feature').reset_index()
+    # flattening out the column index
+    higher_levels = team_fixture_features.columns.get_level_values(0)
+    higher_levels = [x for x in higher_levels if x != 'val']
+    lower_levels = team_fixture_features.columns.get_level_values(1)
+    lower_levels = [x for x in lower_levels if x != '']
+    team_fixture_features.columns = higher_levels + lower_levels
 
     return team_fixture_features
