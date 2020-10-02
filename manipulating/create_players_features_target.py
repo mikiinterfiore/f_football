@@ -193,17 +193,19 @@ def build_season_skeleton(gaz_fv):
 
     gaz_all_seasons = []
     for s in sorted(gaz_fv['season'].unique()):
+        # s = 2019
         season_players = gaz_fv.loc[gaz_fv['season'] == s, ['name', 'surname']].drop_duplicates()
         season_players['gaz_pl_id'] = season_players.index.values + 1
         matches = np.arange(1,39)
         season_index = pd.MultiIndex.from_product([season_players['gaz_pl_id'], matches], names = ["gaz_pl_id", "match"])
         season_skel = pd.DataFrame(index = season_index).reset_index()
-        season_skel = season_skel.merge(season_players, on = 'gaz_pl_id', how = 'left')
+        season_skel = season_skel.merge(season_players, on = 'gaz_pl_id', how='left')
         season_skel['season'] = s
         del season_skel['gaz_pl_id']
         gaz_all_seasons.append(season_skel)
 
     gaz_all_seasons = pd.concat(gaz_all_seasons)
+    gaz_all_seasons.reset_index(drop=True, inplace=True)
 
     return gaz_all_seasons
 
@@ -211,15 +213,19 @@ def build_season_skeleton(gaz_fv):
 def build_players_target(gaz_fv):
 
     # getting all the matches for each player available in that season
-    players_target = build_season_skeleton(gaz_fv)
+    gaz_all_seasons = build_season_skeleton(gaz_fv)
     # merging the gazzetta marks
     keep_cols = ['name', 'surname','season', 'match', 'team','fantavoto']
-    players_target = players_target.merge(gaz_fv.loc[:, keep_cols], how='left',
+
+    players_target = gaz_all_seasons.merge(gaz_fv.loc[:, keep_cols],how='left',
                                             on=['name', 'surname','season', 'match'])
     players_target = players_target.sort_values(by=['name', 'surname', 'season', 'match'])
-    # shifting the fantavoto one match earlier to have the Forward Realised Fantavoto
     pivot_cols = ['name', 'surname','season']
+    # filling the team name if they have not received any fv in that match
+    players_target['team'] = players_target.groupby(pivot_cols)['team'].fillna(method='ffill')
+    # filling the team col on the first matches of the season if they have not played
+    players_target['team'] = players_target.groupby(pivot_cols)['team'].fillna(method='backfill', axis=0)
+    # shifting the fantavoto one match earlier to have the Forward Realised Fantavoto
     players_target['fwd_fantavoto'] = players_target.groupby(pivot_cols)['fantavoto'].shift(-1)
-    players_target['team'] = players_target.groupby(pivot_cols)['team'].shift(-1)
 
     return players_target.loc[:, ['season','match','team','name', 'surname', 'fwd_fantavoto']]

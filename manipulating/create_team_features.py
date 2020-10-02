@@ -14,6 +14,7 @@ def main(focus_source = 'rapid_football'):
     fixtures_master = pd.read_csv(master_file, header=0, index_col=False)
     goals_stats = get_goals_fixture_stats(fixtures_master)
     fixtures_stats = get_detailed_fixture_stats(focus_source)
+    assists = fixtures_stats.loc[fixtures_stats['fixture_stat'] == 'Assists', :]
     # RAW DATA FOR EACH TEAM
     fixtures_combo = combine_fixture_stats(fixtures_stats, goals_stats, fixtures_master)
     team_fixture_stats = prepare_team_stats(fixtures_combo)
@@ -21,9 +22,11 @@ def main(focus_source = 'rapid_football'):
     team_feat_file = os.path.join(_DATA_DIR, 'target_features', 'team_features.csv')
     team_fixture_features.to_csv(team_feat_file, header=True, index=False)
 
-    # MODEL FEATURES FOR EACH PLAYER
+    # inter = team_fixture_features.loc[team_fixture_features['team_name']=='Inter']
+    # inter_feat_file = os.path.join(_DATA_DIR, 'inter_features.csv')
+    # inter.to_csv(inter_feat_file, header=True, index=False)
 
-    # TARGET VARIABLE FOR EACH PLAYER
+    return None
 
 def get_goals_fixture_stats(fixtures_master):
 
@@ -154,11 +157,11 @@ def compute_fixtures_features(team_fixture_stats):
     del team_fixture_features['fixture_stat']
     del team_fixture_features['feat_type']
 
-    team_fixture_features = team_fixture_features.merge(team_fixture_stats.loc[:, ['fixture_id','event_date']],
+    team_fixture_features = team_fixture_features.merge(team_fixture_stats.loc[:, ['fixture_id','event_date', 'league_id']],
                                                         how='left',
                                                         left_index=True,
                                                         right_index=True)
-    pivot_idx = ['team_id', 'team_name', 'event_date', 'fxtr_feature', 'fixture_id']
+    pivot_idx = ['team_id', 'team_name', 'event_date', 'fxtr_feature', 'fixture_id', 'league_id']
     team_fixture_features = team_fixture_features.sort_values(by=pivot_idx)
     team_fixture_features = team_fixture_features.set_index(pivot_idx).unstack('fxtr_feature').reset_index()
     # flattening out the column index

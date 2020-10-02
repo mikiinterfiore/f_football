@@ -43,15 +43,17 @@ def main():
         }
     s.cookies.set(**gaz_cookie)
 
-    for season in [2019, 2018, 2017]:
-        # season = 2018
+    # seasons = [2020, 2019, 2018, 2017]
+    seasons = [2020]
+    for season in seasons:
         for matchday in range(1, 39):
             # matchday = 1
             time.sleep(random.randint(15, 35))
             req = send_gaz_request(s, season, matchday)
             fv_df = extract_gaz_data(req)
             outfile = 'a' + str(season) + '_m'+ str(matchday) + '.csv'
-            fv_df.to_csv(os.path.join(_DATA_DIR, 'fantavoti', outfile), header=True, index=False)
+            if fv_df.shape[0]>1:
+                fv_df.to_csv(os.path.join(_DATA_DIR, 'fantavoti', outfile), header=True, index=False)
 
     return None
 
