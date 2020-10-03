@@ -18,13 +18,17 @@ def main():
     # add the correct name-surnames after manual process
     gaz_players, gaz_fv = clean_players_name(gaz_players, gaz_fv)
     # work on fantavoti history and players stats
-    players_features = build_players_features(gaz_fv)
+    mean_wind = [3,7]
+    sum_wind = [3,7]
+    sd_wind = [10]
+    players_features = build_players_features(gaz_fv, mean_wind, sum_wind, sd_wind)
     players_feat_file = os.path.join(_DATA_DIR, 'target_features', 'players_features.csv')
     players_features.to_csv(players_feat_file, header=True, index=False)
     # players fantavoto as model target variable
     players_target = build_players_target(gaz_fv)
     players_trgt_file = os.path.join(_DATA_DIR, 'target_features', 'players_target.csv')
     players_target.to_csv(players_trgt_file, header=True, index=False)
+
 
 def extract_gaz_data():
 
@@ -88,7 +92,7 @@ def clean_players_name(gaz_players, gaz_fv):
     return gaz_players, gaz_fv
 
 
-def build_players_features(gaz_fv):
+def build_players_features(gaz_fv, mean_wind, sum_wind, sd_wind):
 
     long_gaz_fv = gaz_fv.copy()
     # handling the voto and fantavoto data and re-normalising
@@ -107,29 +111,17 @@ def build_players_features(gaz_fv):
     idx = long_gaz_fv['gaz_stat'].isin(['presenza'])
     long_gaz_fv.loc[~idx, 'val'] = long_gaz_fv.loc[~idx, 'val'].fillna(0)
 
-    # rolling calculations for all the statistics except the goals
+    # rolling calculations for all the statistics except the goals and caps
     stats_idx  = ~long_gaz_fv['gaz_stat'].isin(['presenza', 'voto2', 'fantavoto2'])
     agg_col = ['name',	'surname', 'gaz_stat']
 
-    roll3 = long_gaz_fv.loc[stats_idx].groupby(agg_col)['val'].rolling(window=3, min_periods=2).sum()
-    roll3.index.rename('prev_index', level=3, inplace = True)
-    roll3 = roll3.reset_index([0,1,2])
-    roll3['feat_type'] = 's3'
-
-    roll5 = long_gaz_fv.loc[stats_idx].groupby(agg_col)['val'].rolling(window=5, min_periods=2).sum()
-    roll5.index.rename('prev_index', level=3, inplace = True)
-    roll5 = roll5.reset_index([0,1,2])
-    roll5['feat_type'] = 's5'
-
-    roll10 = long_gaz_fv.loc[stats_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=2).sum()
-    roll10.index.rename('prev_index', level=3, inplace = True)
-    roll10 = roll10.reset_index([0,1,2])
-    roll10['feat_type'] = 's10'
-
-    roll10sd = long_gaz_fv.loc[stats_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=2).std()
-    roll10sd.index.rename('prev_index', level=3, inplace = True)
-    roll10sd = roll10sd.reset_index([0,1,2])
-    roll10sd['feat_type'] = 'sd10'
+    roll_sum_df = []
+    for rw in sum_wind:
+        single_roll_sum = long_gaz_fv.loc[stats_idx].groupby(agg_col)['val'].rolling(window=rw, min_periods=2).sum()
+        single_roll_sum.index.rename('prev_index', level=3, inplace = True)
+        single_roll_sum = single_roll_sum.reset_index([0,1,2])
+        single_roll_sum['feat_type'] = 's'+ str(rw)
+        roll_sum_df.append(single_roll_sum)
 
     # adding rolling count of matches
     pres_idx = long_gaz_fv['gaz_stat'] == 'presenza'
@@ -138,30 +130,31 @@ def build_players_features(gaz_fv):
     count10 = count10.reset_index([0,1,2])
     count10['feat_type'] = 'cnt10'
 
+    roll_sum_df.append(count10)
+    roll_sum_df = pd.concat(roll_sum_df)
+
+    roll_sd_df = []
+    for rw in sd_wind:
+        single_roll_sd = long_gaz_fv.loc[stats_idx].groupby(agg_col)['val'].rolling(window=rw, min_periods=2).std()
+        single_roll_sd.index.rename('prev_index', level=3, inplace = True)
+        single_roll_sd = single_roll_sd.reset_index([0,1,2])
+        single_roll_sd['feat_type'] = 'sd'+ str(rw)
+        roll_sd_df.append(single_roll_sd)
+    roll_sd_df = pd.concat(roll_sd_df)
+
     # adding the fantavoto and voto stats
     voto_idx = long_gaz_fv['gaz_stat'].isin(['voto2', 'fantavoto2'])
-    voto3 = long_gaz_fv.loc[voto_idx].groupby(agg_col)['val'].rolling(window=3, min_periods=1).mean()
-    voto3.index.rename('prev_index', level=3, inplace = True)
-    voto3 = voto3.reset_index([0,1,2])
-    voto3['feat_type'] = 'm3'
+    roll_mean_df = []
+    for rw in mean_wind:
+        single_roll_mean = long_gaz_fv.loc[voto_idx].groupby(agg_col)['val'].rolling(window=rw, min_periods=1).mean()
+        single_roll_mean.index.rename('prev_index', level=3, inplace = True)
+        single_roll_mean = single_roll_mean.reset_index([0,1,2])
+        single_roll_mean['feat_type'] = 'm'+ str(rw)
+        roll_mean_df.append(single_roll_mean)
+    roll_mean_df = pd.concat(roll_mean_df)
 
-    voto5 = long_gaz_fv.loc[voto_idx].groupby(agg_col)['val'].rolling(window=5, min_periods=1).mean()
-    voto5.index.rename('prev_index', level=3, inplace = True)
-    voto5 = voto5.reset_index([0,1,2])
-    voto5['feat_type'] = 'm5'
-
-    voto10 = long_gaz_fv.loc[voto_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=1).mean()
-    voto10.index.rename('prev_index', level=3, inplace = True)
-    voto10 = voto10.reset_index([0,1,2])
-    voto10['feat_type'] = 'm10'
-
-    voto10sd = long_gaz_fv.loc[voto_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=2).std()
-    voto10sd.index.rename('prev_index', level=3, inplace = True)
-    voto10sd = voto10sd.reset_index([0,1,2])
-    voto10sd['feat_type'] = 'sd10'
-
-    players_features = [roll3, roll5, roll10, roll10sd, count10,
-                             voto3, voto5, voto10, voto10sd]
+    # all together
+    players_features = [roll_sum_df, roll_sd_df, roll_mean_df]
     players_features = pd.concat(players_features)
     players_features.loc[players_features['gaz_stat'] == 'voto2', 'gaz_stat'] = 'voto'
     players_features.loc[players_features['gaz_stat'] == 'fantavoto2', 'gaz_stat'] = 'fantavoto'
@@ -175,16 +168,18 @@ def build_players_features(gaz_fv):
                                               left_index=True,
                                               right_index=True)
     pivot_idx = ['team', 'name', 'surname', 'role','season','match', 'gaz_stat']
-
-    players_features['role'] = players_features['role'].astype('category')
     players_features = players_features.sort_values(by=pivot_idx)
-    players_features = players_features.set_index(pivot_idx).unstack('gaz_stat').reset_index()
-    # flattening out the column index
-    higher_levels = players_features.columns.get_level_values(0)
-    higher_levels = [x for x in higher_levels if x != 'val']
-    lower_levels = players_features.columns.get_level_values(1)
-    lower_levels = [x for x in lower_levels if x != '']
-    players_features.columns = higher_levels + lower_levels
+    players_features = players_features.pivot_table(index=pivot_idx[:-1],
+                                                    columns='gaz_stat',
+                                                    values='val').reset_index()
+    # players_features = players_features.set_index(pivot_idx).unstack('gaz_stat').reset_index()
+    players_features['role'] = players_features['role'].astype('category')
+    # # flattening out the column index
+    # higher_levels = players_features.columns.get_level_values(0)
+    # higher_levels = [x for x in higher_levels if x != 'val']
+    # lower_levels = players_features.columns.get_level_values(1)
+    # lower_levels = [x for x in lower_levels if x != '']
+    # players_features.columns = higher_levels + lower_levels
 
     return players_features
 

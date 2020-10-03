@@ -71,6 +71,7 @@ def build_request_url(focus_source, search_params, search_type):
     # 'player_id' : 'players/fixture/%%fixture_id%%',
     'statistics_fixture' :'/statistics/fixture/%%fixture_id%%',
     'next_fixture' : 'fixtures/league/%%league_id%%/next/%%number%%?timezone=Europe/London',
+    'league_round':'fixtures/league/%%league_id%%/Regular_Season_-_%%round%%',
     'player_id' : 'players/squad/%%team_id%%/%%season%%'
     })
 

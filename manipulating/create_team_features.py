@@ -18,7 +18,18 @@ def main(focus_source = 'rapid_football'):
     # RAW DATA FOR EACH TEAM
     fixtures_combo = combine_fixture_stats(fixtures_stats, goals_stats, fixtures_master)
     team_fixture_stats = prepare_team_stats(fixtures_combo)
-    team_fixture_features = compute_fixtures_features(team_fixture_stats)
+    mean_wind = [3,7]
+    sum_wind = [3,7]
+    sd_wind = [10]
+    team_fixture_features = compute_fixtures_features(team_fixture_stats, mean_wind,
+                                                      sum_wind, sd_wind)
+    # adding the correct information about the round to each fixture
+    calendar_file = os.path.join(_DATA_DIR, focus_source, 'masters', 'calendar_master.csv')
+    calendar_data = pd.read_csv(calendar_file, header=0, index_col=False)
+    keep_cols = ['league_id', 'fixture_id', 'match']
+    team_fixture_features = team_fixture_features.merge(calendar_data.loc[:, keep_cols],
+                                                        on=keep_cols[0:2],
+                                                        how='left')
     team_feat_file = os.path.join(_DATA_DIR, 'target_features', 'team_features.csv')
     team_fixture_features.to_csv(team_feat_file, header=True, index=False)
 
@@ -98,7 +109,7 @@ def prepare_team_stats(fixtures_combo):
     return team_fixture_stats
 
 
-def compute_fixtures_features(team_fixture_stats):
+def compute_fixtures_features(team_fixture_stats, mean_wind, sum_wind, sd_wind):
 
     # pre-computation data handling
     team_fixture_stats.sort_values(by = ['league_id','team_id','event_date','fixture_stat'], inplace = True)
@@ -108,49 +119,35 @@ def compute_fixtures_features(team_fixture_stats):
     stats_idx  = ~team_fixture_stats['fixture_stat'].isin(['ht_goal', 'ft_goal'])
     agg_col = ['team_id', 'team_name', 'fixture_stat']
 
-    roll3 = team_fixture_stats.loc[stats_idx].groupby(agg_col)['val'].rolling(window=3, min_periods=2).mean()
-    roll3.index.rename('prev_index', level=3, inplace = True)
-    roll3 = roll3.reset_index([0,1,2])
-    roll3['feat_type'] = 'm3'
+    roll_mean_df = []
+    for rw in mean_wind:
+        single_roll_mean = team_fixture_stats.loc[stats_idx].groupby(agg_col)['val'].rolling(window=rw, min_periods=2).mean()
+        single_roll_mean.index.rename('prev_index', level=3, inplace = True)
+        single_roll_mean = single_roll_mean.reset_index([0,1,2])
+        single_roll_mean['feat_type'] = 'm'+ str(rw)
+        roll_mean_df.append(single_roll_mean)
+    roll_mean_df = pd.concat(roll_mean_df)
 
-    roll5 = team_fixture_stats.loc[stats_idx].groupby(agg_col)['val'].rolling(window=5, min_periods=2).mean()
-    roll5.index.rename('prev_index', level=3, inplace = True)
-    roll5 = roll5.reset_index([0,1,2])
-    roll5['feat_type'] = 'm5'
-
-    roll10 = team_fixture_stats.loc[stats_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=2).mean()
-    roll10.index.rename('prev_index', level=3, inplace = True)
-    roll10 = roll10.reset_index([0,1,2])
-    roll10['feat_type'] = 'm10'
-
-    roll10sd = team_fixture_stats.loc[stats_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=2).std()
-    roll10sd.index.rename('prev_index', level=3, inplace = True)
-    roll10sd = roll10sd.reset_index([0,1,2])
-    roll10sd['feat_type'] = 'sd10'
+    roll_sd_df = []
+    for rw in sd_wind:
+        single_roll_sd = team_fixture_stats.loc[stats_idx].groupby(agg_col)['val'].rolling(window=rw, min_periods=2).std()
+        single_roll_sd.index.rename('prev_index', level=3, inplace = True)
+        single_roll_sd = single_roll_sd.reset_index([0,1,2])
+        single_roll_sd['feat_type'] = 'sd'+ str(rw)
+        roll_sd_df.append(single_roll_sd)
+    roll_sd_df = pd.concat(roll_sd_df)
 
     # adding the half time and full time goal stats
-    gol_s3 = team_fixture_stats.loc[~stats_idx].groupby(agg_col)['val'].rolling(window=3, min_periods=2).sum()
-    gol_s3.index.rename('prev_index', level=3, inplace = True)
-    gol_s3 = gol_s3.reset_index([0,1,2])
-    gol_s3['feat_type'] = 's3'
+    roll_sum_df = []
+    for rw in mean_wind:
+        single_roll_sum = team_fixture_stats.loc[~stats_idx].groupby(agg_col)['val'].rolling(window=rw, min_periods=2).sum()
+        single_roll_sum.index.rename('prev_index', level=3, inplace = True)
+        single_roll_sum = single_roll_sum.reset_index([0,1,2])
+        single_roll_sum['feat_type'] = 's'+ str(rw)
+        roll_sum_df.append(single_roll_sum)
+    roll_sum_df = pd.concat(roll_sum_df)
 
-    gol_s5 = team_fixture_stats.loc[~stats_idx].groupby(agg_col)['val'].rolling(window=5, min_periods=2).sum()
-    gol_s5.index.rename('prev_index', level=3, inplace = True)
-    gol_s5 = gol_s5.reset_index([0,1,2])
-    gol_s5['feat_type'] = 's5'
-
-    gol_s10 = team_fixture_stats.loc[~stats_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=2).sum()
-    gol_s10.index.rename('prev_index', level=3, inplace = True)
-    gol_s10 = gol_s10.reset_index([0,1,2])
-    gol_s10['feat_type'] = 's10'
-
-    gol_sd10 = team_fixture_stats.loc[~stats_idx].groupby(agg_col)['val'].rolling(window=10, min_periods=2).std()
-    gol_sd10.index.rename('prev_index', level=3, inplace = True)
-    gol_sd10 = gol_sd10.reset_index([0,1,2])
-    gol_sd10['feat_type'] = 'sd10'
-
-    team_fixture_features = [roll3, roll5, roll10, roll10sd,
-                             gol_s3, gol_s5, gol_s10, gol_sd10]
+    team_fixture_features = [roll_mean_df, roll_sum_df, roll_sd_df]
     team_fixture_features = pd.concat(team_fixture_features)
     team_fixture_features['fixture_stat'] = team_fixture_features['fixture_stat'].replace(' ', '_', regex=True).str.lower()
     team_fixture_features['fxtr_feature'] = team_fixture_features['fixture_stat'] + '_' + team_fixture_features['feat_type']
