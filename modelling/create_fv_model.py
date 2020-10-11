@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 
 from scipy import stats
+from sklearn.preprocessing import LabelEncoder
+from sklearn.utils.multiclass import type_of_target
 # hyper parameter search
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 # overfitting prevention
@@ -43,7 +45,7 @@ def main(model_type='classifier'):
     full_grid = True
     grid_iter = 80
     softmax_gsearch = run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter)
-    softmax_pkl_filename = 'xgboost_softmax_gridsearch_20201003.pkl'
+    softmax_pkl_filename = 'xgboost_softmax_gridsearch_20201012.pkl'
     softmax_pkl_filename = os.path.join(_DATA_DIR, 'models', softmax_pkl_filename)
     # Open the file to save as pkl files
     with open(softmax_pkl_filename, 'wb') as f:
@@ -53,7 +55,6 @@ def main(model_type='classifier'):
 
     grid_best_params = softmax_gsearch.best_params_
     run_model(grid_best_params, X_train, y_train, rng, model_type)
-
 
     softmax_gsearch.estimator
 
@@ -205,33 +206,9 @@ def combine_data(team_map, fix_master, tm_feat, pl_feat, pl_fv, select_seasons):
     return full_dt
 
 
-def prepare_model_data(full_dt, rng, model_type, target_var='fwd_fv_scaled'):
-
-    # creating features and target data
-    exclude_col = ['name', 'surname', 'season', 'match', 'fwd_fantavoto', 'fwd_fv_scaled']
-    feat_cols = full_dt.columns.values[~full_dt.columns.isin(exclude_col)].tolist()
-
-    X = full_dt.loc[:, feat_cols]
-    X['role'] = X['role'].astype('category')
-    y = full_dt.loc[:, target_var]
-
-    # set the labels for the target if we are using the multiclass
-    if model_type == 'classifier':
-        y = bin_target_values(v=y)
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y,
-                                                        test_size=0.2,
-                                                        random_state=rng,
-                                                        stratify=full_dt['fwd_fv_scaled'])
-    # saving the data to file to simplify the analysis after
-    save_all_data(X_train, X_test, y_train, y_test)
-
-    return X_train, X_test, y_train, y_test
-
-
 def bin_target_values(v):
 
-    neg_fv_groups = [-20] + np.arange(-4.5, 0, 2).tolist()
+    neg_fv_groups = [-20] + np.arange(-2.5, 0, 2).tolist()
     pos_fv_groups = [0] + np.arange(0.5, 5.5, 2).tolist() + [20]
     fv_groups = neg_fv_groups + pos_fv_groups
     bins = []
@@ -248,6 +225,34 @@ def bin_target_values(v):
     return v_bin
 
 
+def prepare_model_data(full_dt, rng, model_type, target_var='fwd_fv_scaled'):
+
+    # creating features and target data
+    exclude_col = ['name', 'surname', 'season', 'match', 'fwd_fantavoto', 'fwd_fv_scaled', 'role']
+    feat_cols = full_dt.columns.values[~full_dt.columns.isin(exclude_col)].tolist()
+
+    X = full_dt.loc[:, feat_cols]
+    # causing issue, should try one hot encoding
+    # X['role'] = X['role'].astype('category')
+    y = full_dt.loc[:, target_var]
+
+    # set the labels for the target if we are using the multiclass
+    if model_type == 'classifier':
+        y = bin_target_values(v=y)
+
+    stratify_df = pd.DataFrame({'fv' : y, 'role' : full_dt['role']})
+    # stratify_df.groupby(['fv', 'role'])['fv'].agg('count')
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y,
+                                                        test_size=0.2,
+                                                        random_state=rng,
+                                                        stratify=stratify_df)
+    # saving the data to file to simplify the analysis after
+    save_all_data(X_train, X_test, y_train, y_test)
+
+    return X_train, X_test, y_train, y_test
+
+
 def save_all_data(X_train, X_test, y_train, y_test ):
 
     X_train.to_csv(os.path.join(_DATA_DIR, 'target_features', 'x_train_dt.csv'), header=True, index=True)
@@ -256,7 +261,7 @@ def save_all_data(X_train, X_test, y_train, y_test ):
     y_test .to_csv(os.path.join(_DATA_DIR, 'target_features', 'y_test_dt.csv'), header=True, index=True)
 
 
-def run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter=80):
+def run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter):
 
     # initialise the model
     # https://xgboost.readthedocs.io/en/latest/python/python_api.html#module-xgboost.sklearn
@@ -284,6 +289,8 @@ def run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter=80):
     if model_type == 'regressor':
         fold5_cv = KFold(n_splits=5, shuffle=False)
     elif model_type == 'classifier':
+        label_encoder = LabelEncoder()
+        y_train = label_encoder.fit_transform(y_train)
         fold5_cv = StratifiedKFold(n_splits=5, shuffle=False)
 
     # parameter grid
@@ -343,6 +350,7 @@ def run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter=80):
         gsearch = GridSearchCV(estimator=model, cv=fold5_cv,
                                param_grid=param_search, pre_dispatch=3,
                                scoring='neg_mean_squared_error', verbose=True)
+
 
     # fitting
     gsearch.fit(X_train, y_train)
