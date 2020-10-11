@@ -3,7 +3,9 @@ import pickle
 import pandas as pd
 import numpy as np
 
-from sklearn.model_selection import train_test_split, KFold, GridSearchCV
+from scipy import stats
+
+from sklearn.model_selection import train_test_split, KFold, GridSearchCV, RandomizedSearchCV
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import mean_squared_error
 
@@ -210,7 +212,7 @@ def prepare_model_data(full_dt, rng, target_var='fwd_fv_scaled'):
     return X_train, X_test, y_train, y_test
 
 
-def run_model(X_train, y_train, rng, model_type, full_grid):
+def run_model(X_train, y_train, rng, model_type, full_grid, grid_iter=10):
 
     # set the labels for the target if we are using the multiclass
     if model_type == 'classifier':
@@ -227,6 +229,7 @@ def run_model(X_train, y_train, rng, model_type, full_grid):
                                  # scoring = 'mse',
                                  eval_metric='rmse')
     elif model_type == 'classifier':
+        # possible to run also multiple metrics as eval : eval_metric = ["merror", "map", "auc"]
         model = XGBClassifier(objective='multi:softmax',
                               booster='gbtree',
                               tree_method='hist', # vs auto, exact, approx, hist, gpu_hist,
@@ -236,28 +239,44 @@ def run_model(X_train, y_train, rng, model_type, full_grid):
                               num_class = len(y_train.unique()),
                               eval_metric='merror') # vs error, mlogloss, auc
 
+    # cross validate: we stratify the train, test split by role, so use simple kfold here
+    fold5_cv = KFold(n_splits=5, random_state=rng)
+
     # parameter grid
+    # for an overview of the cv scoring :
+    # https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-parameter
+    # grid example : https://gist.github.com/fpleoni/c44c0c3654c12abe686a80937d9da200
+
     if full_grid:
-        gamma_params = [i/1000.0 for i in range(25,55,7)] + [0.08, 0.1, 0.2]
-        param_search = {'n_estimators':[1000, 1500, 2000, 2500], # Number of gradient boosted trees.
-                        'max_depth':[4,5,6,7], # Maximum tree depth for base learners.
-                        'learning_rate': [0.003, 0.004, 0.005], # equivalent to eta
-                        # Minimum loss reduction required to make a further partition on a leaf node
-                        'gamma': gamma_params,
+        # determining distribution
+        estim_p = stats.randint(300, 1000) #[300, 500, 700, 1000]
+        depth_p = stats.randint(4, 13) #[5,7,10,15]
+        learn_p = [0.01, 0.1, 0.5]
+        # gamma_p = [0.02]+ [i/100.0 for i in range(10,100,30)] + [1, 1.5]
+        gamma_p = stats.invgamma(1.8)
+        lambd_p = stats.lognorm(0.75)
 
-                         # Minimum sum of instance weight(hessian) needed in a child
-                        # 'min_child_weight':[j for j in range(1,6,2)],
-
-                         # Subsample ratio of the training instance.
-                        'subsample': [0.85], #[i/10.0 for i in range(7,10)],
-                        # Subsample ratio of columns when constructing each tree.
-                        'colsample_bytree': [0.85], #[i/10.0 for i in range(7,10)],
-
-                        # L1 regularization term on weights
-                        # 'reg_alpha':[0, 1e-5, 1e-2, 0.1, 1, 10],
-
-                        # L2 regularization term on weights
-                        'reg_lambda':[0, 1e-5, 1e-2, 0.1, 1, 10]}
+        param_search = {
+            'n_estimators':estim_p, # Number of gradient boosted trees.
+            'max_depth':depth_p, # Maximum tree depth for base learners.
+            'learning_rate':learn_p, # equivalent to eta
+            # Minimum loss reduction required to make a further partition on a leaf node
+            'gamma': gamma_p,
+            # Minimum sum of instance weight(hessian) needed in a child
+            # 'min_child_weight':[j for j in range(1,6,2)],
+            # Subsample ratio of the training instance.
+            'subsample': [0.85], #[i/10.0 for i in range(7,10)],
+            # Subsample ratio of columns when constructing each tree.
+            'colsample_bytree': [0.85], #[i/10.0 for i in range(7,10)],
+            # L1 regularization term on weights
+            # 'reg_alpha':[0, 1e-5, 1e-2, 0.1, 1, 10],
+            # L2 regularization term on weights
+            'reg_lambda':lambd_p
+            }
+        gsearch = RandomizedSearchCV(estimator=model, cv=fold5_cv, n_iter=grid_iter,
+                                     param_distributions=param_search,n_jobs=-1,
+                                     scoring='neg_mean_squared_error',
+                                     verbose=True)
     else:
         param_search = {'n_estimators':[1000], # Number of gradient boosted trees.
                         'max_depth':[7], # Maximum tree depth for base learners.
@@ -277,14 +296,11 @@ def run_model(X_train, y_train, rng, model_type, full_grid):
 
                         # L2 regularization term on weights
                         'reg_lambda':[0.1]}
+        gsearch = GridSearchCV(estimator=model, cv=fold5_cv,
+                               param_grid=param_search, pre_dispatch=3,
+                               scoring='neg_mean_squared_error', verbose=True)
 
-    # cross validate: we stratify the train, test split by role, so use simple kfold here
-    fold5_cv = KFold(n_splits=5, random_state=rng)
-    # for an overview of the cv scoring :
-    # https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-parameter
-    gsearch = GridSearchCV(estimator=model, cv=fold5_cv, param_grid=param_search,
-                           pre_dispatch=3, scoring='neg_mean_squared_error', verbose=True)
-
+    # fitting
     gsearch.fit(X_train, y_train)
 
     return gsearch
