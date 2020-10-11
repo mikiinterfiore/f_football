@@ -4,10 +4,12 @@ import pandas as pd
 import numpy as np
 
 from scipy import stats
-
-from sklearn.model_selection import train_test_split, KFold, GridSearchCV, RandomizedSearchCV
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import mean_squared_error
+# hyper parameter search
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+# overfitting prevention
+from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
+# unknown
+from sklearn.model_selection import cross_validate
 
 from xgboost import XGBRegressor, XGBClassifier
 
@@ -16,7 +18,7 @@ _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 
-def main():
+def main(model_type='classifier'):
 
     # getting the data
     team_map, fix_master = get_masters()
@@ -28,24 +30,32 @@ def main():
     # setting the random seed before the split
     rng = np.random.RandomState(1298)
     # preparing the features
-    X_train, X_test, y_train, y_test = prepare_model_data(full_dt, rng)
-    # saving the data to file to simplify the analysis after
-    save_all_data(X_train, X_test, y_train, y_test)
+    X_train, X_test, y_train, y_test = prepare_model_data(full_dt, rng, model_type)
 
-    # running the model for regression
-    gsearch = run_model(X_train, y_train, rng, model_type='regressor', full_grid=False)
-    regress_pkl_filename = os.path.join(_DATA_DIR, 'models', 'xgboost_nogrid_20201003.pkl')
-    # Open the file to save as pkl file
-    with open(regress_pkl_filename, 'wb') as f:
-        pickle.dump(gsearch, f)
+    # # running the model for regression
+    # gsearch = run_model(X_train, y_train, rng, model_type='regressor', full_grid=False)
+    # regress_pkl_filename = os.path.join(_DATA_DIR, 'models', 'xgboost_nogrid_20201003.pkl')
+    # # Open the file to save as pkl file
+    # with open(regress_pkl_filename, 'wb') as f:
+    #     pickle.dump(gsearch, f)
 
     # running the model for multi-label classification
-    softmax_gsearch = run_model(X_train, y_train, rng, model_type='classifier', full_grid=True)
+    full_grid = True
+    grid_iter = 80
+    softmax_gsearch = run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter)
     softmax_pkl_filename = 'xgboost_softmax_gridsearch_20201003.pkl'
     softmax_pkl_filename = os.path.join(_DATA_DIR, 'models', softmax_pkl_filename)
     # Open the file to save as pkl files
     with open(softmax_pkl_filename, 'wb') as f:
         pickle.dump(softmax_gsearch, f)
+
+    # softmax_gsearch = gsearch
+
+    grid_best_params = softmax_gsearch.best_params_
+    run_model(grid_best_params, X_train, y_train, rng, model_type)
+
+
+    softmax_gsearch.estimator
 
     return None
 
@@ -195,28 +205,58 @@ def combine_data(team_map, fix_master, tm_feat, pl_feat, pl_fv, select_seasons):
     return full_dt
 
 
-def prepare_model_data(full_dt, rng, target_var='fwd_fv_scaled'):
+def prepare_model_data(full_dt, rng, model_type, target_var='fwd_fv_scaled'):
 
     # creating features and target data
-    exclude_col = ['name', 'surname', 'season', 'match', 'role', 'fwd_fantavoto',
-                   'fwd_fv_scaled']
+    exclude_col = ['name', 'surname', 'season', 'match', 'fwd_fantavoto', 'fwd_fv_scaled']
     feat_cols = full_dt.columns.values[~full_dt.columns.isin(exclude_col)].tolist()
 
     X = full_dt.loc[:, feat_cols]
+    X['role'] = X['role'].astype('category')
     y = full_dt.loc[:, target_var]
+
+    # set the labels for the target if we are using the multiclass
+    if model_type == 'classifier':
+        y = bin_target_values(v=y)
+
     X_train, X_test, y_train, y_test = train_test_split(X, y,
                                                         test_size=0.2,
                                                         random_state=rng,
-                                                        stratify=full_dt['role'])
+                                                        stratify=full_dt['fwd_fv_scaled'])
+    # saving the data to file to simplify the analysis after
+    save_all_data(X_train, X_test, y_train, y_test)
 
     return X_train, X_test, y_train, y_test
 
 
-def run_model(X_train, y_train, rng, model_type, full_grid, grid_iter=10):
+def bin_target_values(v):
 
-    # set the labels for the target if we are using the multiclass
-    if model_type == 'classifier':
-        y_train = bin_target_values(y_train)
+    neg_fv_groups = [-20] + np.arange(-4.5, 0, 2).tolist()
+    pos_fv_groups = [0] + np.arange(0.5, 5.5, 2).tolist() + [20]
+    fv_groups = neg_fv_groups + pos_fv_groups
+    bins = []
+    labels = []
+    for i in range(1,len(fv_groups)):
+        bins.append((fv_groups[i-1], fv_groups[i]))
+        labels.append(fv_groups[i-1])
+    bins = pd.IntervalIndex.from_tuples(bins, closed='left') # in this way 0 is counted as positive
+
+    labels_dict = dict(zip(bins, labels))
+    v_bin = pd.cut(v, bins, include_lowest=True)
+    v_bin = v_bin.map(labels_dict)
+
+    return v_bin
+
+
+def save_all_data(X_train, X_test, y_train, y_test ):
+
+    X_train.to_csv(os.path.join(_DATA_DIR, 'target_features', 'x_train_dt.csv'), header=True, index=True)
+    X_test.to_csv(os.path.join(_DATA_DIR, 'target_features', 'x_test_dt.csv'), header=True, index=True)
+    y_train.to_csv(os.path.join(_DATA_DIR, 'target_features', 'y_train_dt.csv'), header=True, index=True)
+    y_test .to_csv(os.path.join(_DATA_DIR, 'target_features', 'y_test_dt.csv'), header=True, index=True)
+
+
+def run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter=80):
 
     # initialise the model
     # https://xgboost.readthedocs.io/en/latest/python/python_api.html#module-xgboost.sklearn
@@ -224,7 +264,7 @@ def run_model(X_train, y_train, rng, model_type, full_grid, grid_iter=10):
         model = XGBRegressor(objective='reg:squarederror',
                                  booster='gbtree',
                                  tree_method='hist', # vs auto, exact, approx, hist, gpu_hist,
-                                 n_jobs=3,
+                                 n_jobs=-1,
                                  random_state=rng,
                                  # scoring = 'mse',
                                  eval_metric='rmse')
@@ -233,14 +273,18 @@ def run_model(X_train, y_train, rng, model_type, full_grid, grid_iter=10):
         model = XGBClassifier(objective='multi:softmax',
                               booster='gbtree',
                               tree_method='hist', # vs auto, exact, approx, hist, gpu_hist,
-                              n_jobs=3,
+                              n_jobs=-1,
                               random_state=rng,
                               # scoring = 'mse',
-                              num_class = len(y_train.unique()),
+                              num_class = len(y_train.cat.categories),
                               eval_metric='merror') # vs error, mlogloss, auc
 
-    # cross validate: we stratify the train, test split by role, so use simple kfold here
-    fold5_cv = KFold(n_splits=5, random_state=rng)
+    # cross validate: we stratify the train, test split by role, and we further
+    # stratify based on y labels if classifier is requested
+    if model_type == 'regressor':
+        fold5_cv = KFold(n_splits=5, shuffle=False)
+    elif model_type == 'classifier':
+        fold5_cv = StratifiedKFold(n_splits=5, shuffle=False)
 
     # parameter grid
     # for an overview of the cv scoring :
@@ -306,27 +350,63 @@ def run_model(X_train, y_train, rng, model_type, full_grid, grid_iter=10):
     return gsearch
 
 
-def bin_target_values(y_train):
+def run_model(grid_best_params, X_train, y_train, rng, model_type):
 
-    fv_groups = [-20] + np.arange(-4.0, 6, 1).tolist() + [20]
-    bins = []
-    labels = []
-    for i in range(1,len(fv_groups)):
-        bins.append((fv_groups[i-1], fv_groups[i]))
-        labels.append(fv_groups[i-1])
-    bins = pd.IntervalIndex.from_tuples(bins, closed='left') # in this way 0 is counted as positive
+    if model_type == 'regressor':
+        model = XGBRegressor(objective='reg:squarederror',
+                             booster='gbtree',
+                             tree_method='hist',
+                             n_jobs=-1,
+                             random_state=rng,
+                             eval_metric='rmse',
+                             # start of parameters taken from the grid
+                             n_estimators = grid_best_params['n_estimators'],
+                             max_depth = grid_best_params['max_depth'],
+                             learning_rate = grid_best_params['learning_rate'],
+                             gamma = grid_best_params['gamma'],
+                             subsample = grid_best_params['subsample'],
+                             colsample_bytree = grid_best_params['colsample_bytree'],
+                             reg_lambda = grid_best_params['reg_lambda'])
 
-    labels_dict = dict(zip(bins, labels))
-    y_train_bin = pd.cut(y_train, bins, include_lowest=True)
-    y_train_bin = y_train_bin.map(labels_dict)
-    print(y_train_bin.value_counts())
+    elif model_type == 'classifier':
+        # possible to run also multiple metrics as eval : eval_metric = ["merror", "map", "auc"]
+        model = XGBClassifier(objective='multi:softmax',
+                              booster='gbtree',
+                              tree_method='hist',
+                              n_jobs=-1,
+                              random_state=rng,
+                              num_class = len(y_train.cat.categories),
+                              eval_metric='merror',
+                              # start of parameters taken from the grid
+                              n_estimators = grid_best_params['n_estimators'],
+                              max_depth = grid_best_params['max_depth'],
+                              learning_rate = grid_best_params['learning_rate'],
+                              subsample = grid_best_params['subsample'],
+                              colsample_bytree = grid_best_params['colsample_bytree'],
+                              reg_lambda = grid_best_params['reg_lambda'])
 
-    return y_train_bin
+    # #Set our final hyperparameters to the tuned values
+    if model_type == 'regressor':
+        fold5_cv = KFold(n_splits=5, shuffle=False)
+    elif model_type == 'classifier':
+        fold5_cv = StratifiedKFold(n_splits=5, shuffle=False)
 
+    # Evaluate metric(s) by cross-validation and also record fit/score times
+    cv_scoring = ['accuracy', 'roc_auc', 'precision', 'recall', 'f1']
+    cv_scores = cross_validate(estimator=model,
+                               X=X_train,
+                               y=y_train,
+                               cv=fold5_cv,
+                               n_jobs=-1,
+                               scoring=cv_scoring)
 
-def save_all_data(X_train, X_test, y_train, y_test ):
+    print('Training 5-fold Cross Validation Results:\n')
+    print('AUC: ', cv_scores['test_roc_auc'].mean())
+    print('Accuracy: ', cv_scores['test_accuracy'].mean())
+    print('Precision: ', cv_scores['test_precision'].mean())
+    print('Recall: ', cv_scores['test_recall'].mean())
+    print('F1: ', cv_scores['test_f1'].mean(), '\n')
 
-    X_train.to_csv(os.path.join(_DATA_DIR, 'target_features', 'x_train_dt.csv'), header=True, index=True)
-    X_test.to_csv(os.path.join(_DATA_DIR, 'target_features', 'x_test_dt.csv'), header=True, index=True)
-    y_train.to_csv(os.path.join(_DATA_DIR, 'target_features', 'y_train_dt.csv'), header=True, index=True)
-    y_test .to_csv(os.path.join(_DATA_DIR, 'target_features', 'y_test_dt.csv'), header=True, index=True)
+    model.fit(X_train, y_train)
+
+    return model
