@@ -4,14 +4,12 @@ import pandas as pd
 import numpy as np
 
 from scipy import stats
-from sklearn.preprocessing import LabelEncoder
-from sklearn.utils.multiclass import type_of_target
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 # hyper parameter search
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_validate
 # overfitting prevention
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
-# unknown
-from sklearn.model_selection import cross_validate
+from sklearn.metrics import accuracy_score
 
 from xgboost import XGBRegressor, XGBClassifier
 
@@ -20,7 +18,7 @@ _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 
-def main(model_type='classifier'):
+def main(model_type='classifier', use_class_scale=True):
 
     # getting the data
     team_map, fix_master = get_masters()
@@ -32,7 +30,7 @@ def main(model_type='classifier'):
     # setting the random seed before the split
     rng = np.random.RandomState(1298)
     # preparing the features
-    X_train, X_test, y_train, y_test = prepare_model_data(full_dt, rng, model_type)
+    X_train, X_test, y_train, y_test, label_encoder = prepare_model_data(full_dt, rng, model_type)
 
     # # running the model for regression
     # gsearch = run_model(X_train, y_train, rng, model_type='regressor', full_grid=False)
@@ -41,22 +39,34 @@ def main(model_type='classifier'):
     # with open(regress_pkl_filename, 'wb') as f:
     #     pickle.dump(gsearch, f)
 
+    scale_weight = np.repeat(1, len(y_test) + len(y_train))
+    if model_type=='classifier' and use_class_scale:
+        scale_weight, labels_weight_map = assign_label_relative_importance(y_train,
+                                                                           y_test,
+                                                                           label_encoder)
+
     # running the model for multi-label classification
     full_grid = True
     grid_iter = 80
-    softmax_gsearch = run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter)
-    softmax_pkl_filename = 'xgboost_softmax_gridsearch_20201012.pkl'
+    softmax_gsearch = run_grid(X_train, y_train, rng, model_type, full_grid,
+                               grid_iter, scale_weight)
+    softmax_pkl_filename = 'xgboost_softmax_gridsearch_20201013.pkl'
     softmax_pkl_filename = os.path.join(_DATA_DIR, 'models', softmax_pkl_filename)
     # Open the file to save as pkl files
     with open(softmax_pkl_filename, 'wb') as f:
         pickle.dump(softmax_gsearch, f)
 
     # softmax_gsearch = gsearch
-
+    # type_of_target(y_train)
+    # type_of_target(y_test)
     grid_best_params = softmax_gsearch.best_params_
-    run_model(grid_best_params, X_train, y_train, rng, model_type)
-
-    softmax_gsearch.estimator
+    validation_out, validated_model = run_model(grid_best_params, X_train, y_train,
+                                                rng, model_type, scale_weight)
+    softmax_validated_filename = 'xgboost_softmax_validated_20201013.pkl'
+    softmax_validated_filename = os.path.join(_DATA_DIR, 'models', softmax_validated_filename)
+    # Open the file to save as pkl files
+    with open(softmax_validated_filename, 'wb') as f:
+        pickle.dump(validated_model, f)
 
     return None
 
@@ -237,8 +247,11 @@ def prepare_model_data(full_dt, rng, model_type, target_var='fwd_fv_scaled'):
     y = full_dt.loc[:, target_var]
 
     # set the labels for the target if we are using the multiclass
+    label_encode = None
     if model_type == 'classifier':
         y = bin_target_values(v=y)
+        label_encoder = LabelEncoder()
+        y = label_encoder.fit_transform(y)
 
     stratify_df = pd.DataFrame({'fv' : y, 'role' : full_dt['role']})
     # stratify_df.groupby(['fv', 'role'])['fv'].agg('count')
@@ -248,20 +261,36 @@ def prepare_model_data(full_dt, rng, model_type, target_var='fwd_fv_scaled'):
                                                         random_state=rng,
                                                         stratify=stratify_df)
     # saving the data to file to simplify the analysis after
-    save_all_data(X_train, X_test, y_train, y_test)
+    save_all_data(X_train, X_test, y_train, y_test, target_var)
 
-    return X_train, X_test, y_train, y_test
+    return X_train, X_test, y_train, y_test, label_encoder
 
 
-def save_all_data(X_train, X_test, y_train, y_test ):
+def save_all_data(X_train, X_test, y_train, y_test, target_var):
 
     X_train.to_csv(os.path.join(_DATA_DIR, 'target_features', 'x_train_dt.csv'), header=True, index=True)
     X_test.to_csv(os.path.join(_DATA_DIR, 'target_features', 'x_test_dt.csv'), header=True, index=True)
-    y_train.to_csv(os.path.join(_DATA_DIR, 'target_features', 'y_train_dt.csv'), header=True, index=True)
-    y_test .to_csv(os.path.join(_DATA_DIR, 'target_features', 'y_test_dt.csv'), header=True, index=True)
+    pd.DataFrame({target_var:y_train}).to_csv(os.path.join(_DATA_DIR, 'target_features', 'y_train_dt.csv'), header=True, index=True)
+    pd.DataFrame({target_var:y_test}).to_csv(os.path.join(_DATA_DIR, 'target_features', 'y_test_dt.csv'), header=True, index=True)
 
 
-def run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter):
+def assign_label_relative_importance(y_train, y_test, label_encoder):
+
+    y_tot = np.concatenate((y_train, y_test))
+    y_labels_freq = np.unique(y_tot, return_counts=True)
+    # encoded_map = dict(zip(label_encoder.classes_, np.unique(y_train)))
+    # original_labels_freq = dict(zip(label_encoder.classes_,
+    #                                 np.max(y_labels_freq[1])/y_labels_freq[1]))
+    labels_weight_map = dict(zip(label_encoder.classes_,  [50, 25, 10, 1, 10, 25, 50]))
+    encoded_weight_map = dict(zip(y_labels_freq[0], [50, 25, 10, 1, 10, 25, 50]))
+    y_tot = pd.DataFrame({'label' : y_tot})
+    y_tot['weight'] = y_tot['label'].map(encoded_weight_map)
+    scale_weight = y_tot['weight'].copy()
+
+    return scale_weight, labels_weight_map
+
+
+def run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter, scale_weight):
 
     # initialise the model
     # https://xgboost.readthedocs.io/en/latest/python/python_api.html#module-xgboost.sklearn
@@ -281,16 +310,14 @@ def run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter):
                               n_jobs=-1,
                               random_state=rng,
                               # scoring = 'mse',
-                              num_class = len(y_train.cat.categories),
-                              eval_metric='merror') # vs error, mlogloss, auc
+                              num_class = len(np.unique(y_train)),
+                              eval_metric='mlogloss') # vs error, mlogloss, auc
 
     # cross validate: we stratify the train, test split by role, and we further
     # stratify based on y labels if classifier is requested
     if model_type == 'regressor':
         fold5_cv = KFold(n_splits=5, shuffle=False)
     elif model_type == 'classifier':
-        label_encoder = LabelEncoder()
-        y_train = label_encoder.fit_transform(y_train)
         fold5_cv = StratifiedKFold(n_splits=5, shuffle=False)
 
     # parameter grid
@@ -353,12 +380,13 @@ def run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter):
 
 
     # fitting
-    gsearch.fit(X_train, y_train)
+    ins_scale_weight = scale_weight[0:len(y_train)]
+    gsearch.fit(X=X_train, y=y_train,sample_weight=ins_scale_weight)
 
     return gsearch
 
 
-def run_model(grid_best_params, X_train, y_train, rng, model_type):
+def run_model(grid_best_params, X_train, y_train, rng, model_type, scale_weight):
 
     if model_type == 'regressor':
         model = XGBRegressor(objective='reg:squarederror',
@@ -383,8 +411,8 @@ def run_model(grid_best_params, X_train, y_train, rng, model_type):
                               tree_method='hist',
                               n_jobs=-1,
                               random_state=rng,
-                              num_class = len(y_train.cat.categories),
-                              eval_metric='merror',
+                              num_class = len(np.unique(y_train)),
+                              eval_metric='mlogloss',
                               # start of parameters taken from the grid
                               n_estimators = grid_best_params['n_estimators'],
                               max_depth = grid_best_params['max_depth'],
@@ -399,22 +427,26 @@ def run_model(grid_best_params, X_train, y_train, rng, model_type):
     elif model_type == 'classifier':
         fold5_cv = StratifiedKFold(n_splits=5, shuffle=False)
 
-    # Evaluate metric(s) by cross-validation and also record fit/score times
-    cv_scoring = ['accuracy', 'roc_auc', 'precision', 'recall', 'f1']
-    cv_scores = cross_validate(estimator=model,
-                               X=X_train,
-                               y=y_train,
-                               cv=fold5_cv,
-                               n_jobs=-1,
-                               scoring=cv_scoring)
+    validation_out = cross_validate(model,
+                                     X=X_train.iloc[:1000,:],
+                                     y=y_train[:1000,],
+                                     scoring=['accuracy'],
+                                     cv=fold5_cv,
+                                     n_jobs=-1,
+                                     verbose=1,
+                                     return_estimator=True)
 
-    print('Training 5-fold Cross Validation Results:\n')
-    print('AUC: ', cv_scores['test_roc_auc'].mean())
-    print('Accuracy: ', cv_scores['test_accuracy'].mean())
-    print('Precision: ', cv_scores['test_precision'].mean())
-    print('Recall: ', cv_scores['test_recall'].mean())
-    print('F1: ', cv_scores['test_f1'].mean(), '\n')
+    # Fit the final model
+    ins_scale_weight = scale_weight[0:len(y_train)]
+    validated_model = model.fit(X_train, y_train, sample_weight=ins_scale_weight)
 
-    model.fit(X_train, y_train)
+    # accuracy_model = []
+    # for k, (train, test) in enumerate(fold5_cv.split(X_train, y_train)):
+    #     train_idx = X_train.index.isin(train)
+    #     single_fold = model.fit(X_train[train_idx], y_train[train_idx])
+    #     accuracy_model.append(accuracy_score(y_train[train_idx],
+    #                                          single_fold.predict(X_train[train_idx]),
+    #                                          average=None)*100)
 
-    return model
+
+    return validation_out, validated_model
