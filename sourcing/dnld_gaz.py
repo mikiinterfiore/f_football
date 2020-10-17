@@ -16,7 +16,7 @@ _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 
-def main():
+def dnld_gaz_data(seasons, last_matchday=39):
 
     s = requests.session()
     # cookie_obj = requests.cookies.create_cookie(domain='',
@@ -44,13 +44,12 @@ def main():
     s.cookies.set(**gaz_cookie)
 
     # seasons = [2020, 2019, 2018, 2017]
-    seasons = [2020]
     for season in seasons:
-        for matchday in range(1, 39):
+        for matchday in range(1, last_matchday):
             # matchday = 1
             time.sleep(random.randint(15, 35))
-            req = send_gaz_request(s, season, matchday)
-            fv_df = extract_gaz_data(req)
+            req = _send_gaz_request(s, season, matchday)
+            fv_df = _extract_gaz_data(req)
             outfile = 'a' + str(season) + '_m'+ str(matchday) + '.csv'
             if fv_df.shape[0]>1:
                 fv_df.to_csv(os.path.join(_DATA_DIR, 'fantavoti', outfile), header=True, index=False)
@@ -58,7 +57,7 @@ def main():
     return None
 
 
-def send_gaz_request(s, season, matchday):
+def _send_gaz_request(s, season, matchday):
 
     main_url = 'https://www.gazzetta.it/calcio/fantanews/voti/'
     # 'serie-a-2019-20/giornata-38'
@@ -67,7 +66,7 @@ def send_gaz_request(s, season, matchday):
     giornata = 'giornata-' + str(matchday)
     url = main_url + torneo + '-' + stagione + '/' + giornata
     # headers
-    headers = create_req_headers()
+    headers = _create_req_headers()
     # get request
     req = s.get(url, headers=headers)
     # safety checks
@@ -83,19 +82,10 @@ def send_gaz_request(s, season, matchday):
     elif status_code == requests.codes.too_many_requests:
         sys.exit('You have exceeded your allowed requests per minute/day')
 
-    # try:
-    #     # something
-    # except Exception as e:
-    #     # If the download for some reason fails (ex. 404) the script will continue downloading
-    #     # the next article.
-    #     print(e)
-    #     print("continuing...")
-    #     continue
-
     return req
 
 
-def extract_gaz_data(req):
+def _extract_gaz_data(req):
 
     # HTML elemenets:
     # ul : unordered list || li : ordered list
@@ -119,8 +109,8 @@ def extract_gaz_data(req):
         voti_giocatori = vs.find_all('li')
         # first list component is the header of the table so we skip
         for vg in voti_giocatori[1:]:
-            player, role = extract_html_player_info(vg)
-            stats = extract_html_player_stats(vg)
+            player, role = _extract_html_player_info(vg)
+            stats = _extract_html_player_stats(vg)
             new_row = {'team' : nome_squadra,
                        'name' : player[0],
                        'surname' : player[1],
@@ -139,7 +129,7 @@ def extract_gaz_data(req):
     return fv_df
 
 
-def create_req_headers():
+def _create_req_headers():
 
     desktop_agents = [
     'Mozilla/5.0 (Windows NT 5.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2224.3 Safari/537.36',
@@ -170,7 +160,7 @@ def create_req_headers():
     return headers
 
 
-def find_html_player_data(tag):
+def _find_html_player_data(tag):
     # function to get all the data for a player without splitting the search into
     # 'inParameter Vparameter', 'inParameter FVParameter', 'inParameter',
     if tag.has_attr('class'):
@@ -178,7 +168,7 @@ def find_html_player_data(tag):
             return tag
 
 
-def extract_html_player_info(vg):
+def _extract_html_player_info(vg):
 
     # vg is the HTML tree containing the player informations
     player = vg.find('span', attrs={'class': 'playerNameIn'}).find('a').get('href')
@@ -203,16 +193,16 @@ def extract_html_player_info(vg):
     return player, role
 
 
-def extract_html_player_stats(vg):
+def _extract_html_player_stats(vg):
 
     # extract the HMTL components based on attributes
     stats = vg.find_all(find_html_player_data)
     # cleanup strings and from string to integer
-    stats = [clean_player_data(x) for x in stats]
+    stats = [_clean_player_data(x) for x in stats]
     return stats
 
 
-def clean_player_data(string_data):
+def _clean_player_data(string_data):
 
     delete_string = re.compile(r'[\n\r\t ]')
     string_data = delete_string.sub('', string_data.get_text())

@@ -8,6 +8,7 @@
 
 import os
 import pickle
+import json
 import pandas as pd
 import numpy as np
 
@@ -38,9 +39,15 @@ def main(model_type='classifier'):
         label_encoder.fit(y_tot['fwd_fv_scaled'])
         y_train = label_encoder.transform(y_train['fwd_fv_scaled'])
         y_test = label_encoder.transform(y_test['fwd_fv_scaled'])
+        # get the original encoding map
+        encoded_map_filename = 'xgboost_softmax_label_encoder_20201013.pkl'
+        encoded_map_filename = os.path.join(_DATA_DIR, 'models', encoded_map_filename)
+        # Open the file to save as pkl files
+        with open(encoded_map_filename, 'r') as f:
+            encoded_map = json.load(f)
 
     # getting the model trained with multiclass objective
-    softmax_validated_filename = os.path.join(_DATA_DIR, 'models', 'xgboost_softmax_validated_20201012.pkl')
+    softmax_validated_filename = os.path.join(_DATA_DIR, 'models', 'xgboost_softmax_validated_20201013.pkl')
     # Open the file to save as pkl files
     with open(softmax_validated_filename, 'rb') as f:
         classi_model =  pickle.load(f)
@@ -59,10 +66,14 @@ def main(model_type='classifier'):
 
     ins_metrics, ins_report = analyse_ins_prediction(classi_model, X_train,
                                                      y_train, ins_preds,
-                                                     ins_prob_preds, model_type)
+                                                     ins_prob_preds, model_type,
+                                                     encoded_map)
+    print(ins_report)
     oos_metrics, oos_report = analyse_oos_prediction(classi_model,
                                                      y_test, oos_preds,
-                                                     oos_prob_preds, model_type)
+                                                     oos_prob_preds, model_type,
+                                                     encoded_map)
+    print(oos_report)
     return None
 
 
@@ -77,11 +88,11 @@ def get_train_test_data(model_type):
     return X_train, y_train, X_test, y_test
 
 
-def analyse_ins_prediction(model, X_train, y_train, ins_preds, ins_prob_preds, model_type):
+def analyse_ins_prediction(model, X_train, y_train, ins_preds, ins_prob_preds, model_type, encoded_map):
 
     # model = regres_model
     # model = classi_model
-    feat_importance = pd.Series(model.best_estimator_.feature_importances_)
+    feat_importance = pd.Series(model.feature_importances_)
     feat_importance.index = X_train.columns.values
     feat_importance.sort_values(ascending=True, inplace=True)
 
@@ -123,19 +134,23 @@ def analyse_ins_prediction(model, X_train, y_train, ins_preds, ins_prob_preds, m
             # ,'roc_auc' : roc_auc_score(y_train, ins_preds, multi_class='ovr', average="macro")
         })
         ins_report = classification_report(y_train, ins_preds)
-        print(ins_report)
+        # print(ins_report)
 
     compare_dt = pd.DataFrame({'true' : y_train, 'pred' : ins_preds})
-    kwargs = dict(histtype='stepfilled', alpha=0.3, bins=200)
-    fig = plt.figure(figsize=(10,8))
-    plt.hist(data=compare_dt[['true']], x='true', **kwargs)
-    plt.hist(data=compare_dt[['pred']], x='pred', **kwargs)
+    x = compare_dt['true'].value_counts().index  # the label locations
+    width = 0.35  # the width of the bars
+    fig, ax = plt.subplots(figsize=(10,8))
+    ax.bar(x - width/2, compare_dt['true'].value_counts(), width, label='True')
+    ax.bar(x + width/2, compare_dt['pred'].value_counts(), width, label='Pred')
+    ax.set_xticks(x)
+    ax.set_xticklabels([list(encoded_map.keys())[k] for k in x.values])
+    ax.legend()
     fig.savefig(os.path.join(_DATA_DIR, 'figs', 'xgb_'+model_type+'_ins_pred.jpg'), bbox_inches='tight', dpi=150)
 
     return ins_metrics, ins_report
 
 
-def analyse_oos_prediction(model, y_test, oos_preds, oos_prob_preds, model_type):
+def analyse_oos_prediction(model, y_test, oos_preds, oos_prob_preds, model_type, encoded_map):
 
     if model_type == 'regressor':
         oos_metrics = dict({
@@ -157,13 +172,17 @@ def analyse_oos_prediction(model, y_test, oos_preds, oos_prob_preds, model_type)
             # ,'roc_auc' : roc_auc_score(y_train, ins_preds, multi_class='ovr', average="macro")
         })
         oos_report = classification_report(y_test, oos_preds)
-        print(oos_report)
+        # print(oos_report)
 
     compare_dt = pd.DataFrame({'true' : y_test, 'pred' : oos_preds})
-    kwargs = dict(histtype='stepfilled', alpha=0.3, bins=200)
-    fig = plt.figure(figsize=(10,8))
-    plt.hist(data=compare_dt[['true']], x='true', **kwargs)
-    plt.hist(data=compare_dt[['pred']], x='pred', **kwargs)
+    x = compare_dt['true'].value_counts().index  # the label locations
+    width = 0.35  # the width of the bars
+    fig, ax = plt.subplots(figsize=(10,8))
+    ax.bar(x - width/2, compare_dt['true'].value_counts(), width, label='True')
+    ax.bar(x + width/2, compare_dt['pred'].value_counts(), width, label='Pred')
+    ax.set_xticks(x)
+    ax.set_xticklabels([list(encoded_map.keys())[k] for k in x.values])
+    ax.legend()
     fig.savefig(os.path.join(_DATA_DIR, 'figs', 'xgb_'+model_type+'_oos_pred.jpg'), bbox_inches='tight', dpi=150)
 
     return oos_metrics, oos_report
@@ -172,7 +191,6 @@ def analyse_oos_prediction(model, y_test, oos_preds, oos_prob_preds, model_type)
 def analyse_shap(model, X_train, y_train, X_test, y_test):
 
     rnd_idx = np.rnd()
-
     # model = classi_model['estimator'][1]
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_train)

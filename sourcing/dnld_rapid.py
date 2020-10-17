@@ -1,3 +1,8 @@
+# RAPID FOOTBALL DATA API
+# DETAILS FREE PLAN: 100/day requests MAX, 30/min requests MAX
+# https://rapidapi.com/api-sports/api/api-football/details
+# https://rapidapi.com/api-sports/api/api-football/tutorials/how-to-use-the-api-football-api-with-python
+
 import os
 import sys
 import requests
@@ -9,16 +14,11 @@ import pandas as pd
 
 from utils.utils_rapid_football import *
 
-
 _BASE_DIR = '/home/costam/Documents'
 _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 
 
-# DETAILS FREE PLAN: 100/day requests MAX, 30/min requests MAX
-# https://rapidapi.com/api-sports/api/api-football/details
-# https://rapidapi.com/api-sports/api/api-football/tutorials/how-to-use-the-api-football-api-with-python
-
-def main(focus_source = 'rapid_football'):
+def dnld_rapid_data(focus_source = 'rapid_football'):
 
     api_key = get_api_creds(focus_source)
     req_headers = dict({'X-RapidAPI-Key' : api_key,
