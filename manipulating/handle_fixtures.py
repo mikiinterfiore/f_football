@@ -5,12 +5,14 @@ import pandas as pd
 import datetime as dt
 from dateutil import tz
 
+from utils.utils_rapid_football import *
+
 _BASE_DIR = '/home/costam/Documents'
 _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 
-def main(focus_source = 'rapid_football'):
+def get_updated_fixture_master_stats(focus_source = 'rapid_football'):
 
     # loading the previously built master for all matches (fixtures)
     master_file = os.path.join(_DATA_DIR, focus_source, 'masters', 'fixture_master.csv')
@@ -26,3 +28,5 @@ def main(focus_source = 'rapid_football'):
     fixtures_stats = update_fixtures_stats(fixtures_stats, fixtures_master,
                                            fixtures_stats_file, focus_source)
     fixtures_stats.to_csv(fixtures_stats_file, header=True, index=False)
+
+    return None

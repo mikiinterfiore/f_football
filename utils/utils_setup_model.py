@@ -22,3 +22,27 @@ def bin_target_values(v):
     v_bin = v_bin.map(labels_dict)
 
     return v_bin
+
+
+def assign_label_relative_importance(y_train, y_test, label_encoder):
+
+    y_tot = np.concatenate((y_train, y_test))
+    y_labels_freq = np.unique(y_tot, return_counts=True)
+    # original_labels_freq = dict(zip(label_encoder.classes_,
+    #                                 np.max(y_labels_freq[1])/y_labels_freq[1]))
+    labels_weight_map = dict(zip(label_encoder.classes_,  [50, 25, 10, 1, 10, 25, 50]))
+    encoded_weight_map = dict(zip(y_labels_freq[0], [50, 25, 10, 1, 10, 25, 50]))
+    y_tot = pd.DataFrame({'label' : y_tot})
+    y_tot['weight'] = y_tot['label'].map(encoded_weight_map)
+    scale_weight = y_tot['weight'].copy()
+
+
+    encoded_map = dict(zip(map(str, label_encoder.classes_),
+                           map(int, np.unique(y_tot))))
+    encoded_map_filename = 'xgboost_softmax_label_encoder_20201013.pkl'
+    encoded_map_filename = os.path.join(_DATA_DIR, 'models', encoded_map_filename)
+    # Open the file to save as pkl files
+    with open(encoded_map_filename, 'w') as f:
+        json.dump(encoded_map, f)
+
+    return scale_weight, labels_weight_map

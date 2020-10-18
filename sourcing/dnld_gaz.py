@@ -16,7 +16,7 @@ _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 
-def dnld_gaz_data(seasons, last_matchday=39):
+def dnld_gaz_data(seasons, start_round=1, final_round=39):
 
     s = requests.session()
     # cookie_obj = requests.cookies.create_cookie(domain='',
@@ -45,7 +45,7 @@ def dnld_gaz_data(seasons, last_matchday=39):
 
     # seasons = [2020, 2019, 2018, 2017]
     for season in seasons:
-        for matchday in range(1, last_matchday):
+        for matchday in range(start_round, final_round):
             # matchday = 1
             time.sleep(random.randint(15, 35))
             req = _send_gaz_request(s, season, matchday)
@@ -196,7 +196,7 @@ def _extract_html_player_info(vg):
 def _extract_html_player_stats(vg):
 
     # extract the HMTL components based on attributes
-    stats = vg.find_all(find_html_player_data)
+    stats = vg.find_all(_find_html_player_data)
     # cleanup strings and from string to integer
     stats = [_clean_player_data(x) for x in stats]
     return stats

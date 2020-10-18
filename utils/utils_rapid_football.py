@@ -31,7 +31,8 @@ def get_api_creds(focus_source):
     return api_key
 
 
-def wrap_api_request(day_num_request, focus_source, req_headers, search_params, search_type, search_target=None):
+def wrap_api_request(day_num_request, focus_source, req_headers, search_params,
+                     search_type, search_target=None, overwrite=False):
 
     out_dir = os.path.join(_DATA_DIR, focus_source, search_type.replace('_', '').lower())
     # unpacking the search_params
@@ -39,11 +40,12 @@ def wrap_api_request(day_num_request, focus_source, req_headers, search_params, 
     for k in search_params:
         filename = filename + k.replace('_', '').lower() + '-' + str(search_params[k]) + '_'
     filename = filename + '.json'
-    if filename not in os.listdir(out_dir):
+    if (filename not in os.listdir(out_dir)) | (overwrite):
         req = _send_request(focus_source, search_params, search_type, req_headers)
         data = _read_request_data(req, search_type, search_target)
-        with open(os.path.join(out_dir, filename), 'w') as outfile:
-            json.dump(data, outfile)
+        if data is not None:
+            with open(os.path.join(out_dir, filename), 'w') as outfile:
+                json.dump(data, outfile)
         day_num_request = day_num_request + 1
     else:
         with open(os.path.join(out_dir, filename), 'r') as inputfile:
@@ -114,24 +116,28 @@ def _read_request_data(req, search_type, search_target = None):
     raw_data = json.loads(req.text)
     extract_focus = list(raw_data['api'].keys())[1]
 
-    if search_type == 'statistics_fixture':
-        # the structure of the data is different!!
-        final_data = pd.DataFrame(columns=['fixture_stat', 'home', 'away'])
-        for k in list(raw_data['api'][extract_focus].keys()):
-            raw_dict = raw_data['api'][extract_focus][k]
-            raw_dict['fixture_stat'] = k
-            final_data = final_data.append(raw_dict, ignore_index=True)
-        final_data = final_data.to_dict()
+    final_data = None
+    if raw_data['api']['results'] > 0:
 
-    elif search_type != 'statistics_fixture':
-        final_data = []
-        for d in raw_data['api'][extract_focus]:
-            if search_target is None:
-                # adding all the results from the call
-                final_data.append(d)
-            else:
-                if d['name'] == search_target:
+        if search_type == 'statistics_fixture':
+            # the structure of the data is different!!
+            final_data = pd.DataFrame(columns=['fixture_stat', 'home', 'away'])
+            # print(raw_data['api'][extract_focus].keys())
+            for k in list(raw_data['api'][extract_focus].keys()):
+                raw_dict = raw_data['api'][extract_focus][k]
+                raw_dict['fixture_stat'] = k
+                final_data = final_data.append(raw_dict, ignore_index=True)
+            final_data = final_data.to_dict()
+
+        elif search_type != 'statistics_fixture':
+            final_data = []
+            for d in raw_data['api'][extract_focus]:
+                if search_target is None:
+                    # adding all the results from the call
                     final_data.append(d)
+                else:
+                    if d['name'] == search_target:
+                        final_data.append(d)
 
     return final_data
 
@@ -224,4 +230,3 @@ def update_fixture_master(fixtures_master, fixture_dir):
     fixtures_master = fixtures_master.set_index('event_date', drop=True).tz_convert('Europe/London').reset_index()
 
     return fixtures_master
-    

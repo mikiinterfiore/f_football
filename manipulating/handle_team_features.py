@@ -7,21 +7,21 @@ _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 
-def main(focus_source = 'rapid_football'):
+def create_tm_features(focus_source, feat_windows):
 
     # load the fixtures master
     master_file = os.path.join(_DATA_DIR, focus_source, 'masters', 'fixture_master.csv')
     fixtures_master = pd.read_csv(master_file, header=0, index_col=False)
-    goals_stats = get_goals_fixture_stats(fixtures_master)
-    fixtures_stats = get_detailed_fixture_stats(focus_source)
+    goals_stats = _get_goals_fixture_stats(fixtures_master)
+    fixtures_stats = _get_detailed_fixture_stats(focus_source)
     assists = fixtures_stats.loc[fixtures_stats['fixture_stat'] == 'Assists', :]
     # RAW DATA FOR EACH TEAM
-    fixtures_combo = combine_fixture_stats(fixtures_stats, goals_stats, fixtures_master)
-    team_fixture_stats = prepare_team_stats(fixtures_combo)
-    mean_wind = [3,7]
-    sum_wind = [3,7]
-    sd_wind = [10]
-    team_fixture_features = compute_fixtures_features(team_fixture_stats, mean_wind,
+    fixtures_combo = _combine_fixture_stats(fixtures_stats, goals_stats, fixtures_master)
+    team_fixture_stats = _prepare_team_stats(fixtures_combo)
+    mean_wind = feat_windows['mean_wind']
+    sum_wind = feat_windows['sum_wind']
+    sd_wind = feat_windows['sd_wind']
+    team_fixture_features = _compute_fixtures_features(team_fixture_stats, mean_wind,
                                                       sum_wind, sd_wind)
     # adding the correct information about the round to each fixture
     calendar_file = os.path.join(_DATA_DIR, focus_source, 'masters', 'calendar_master.csv')
@@ -39,7 +39,7 @@ def main(focus_source = 'rapid_football'):
 
     return None
 
-def get_goals_fixture_stats(fixtures_master):
+def _get_goals_fixture_stats(fixtures_master):
 
     # extracting the data for halftime and fulltime goals
     goals_stats = fixtures_master.loc[:,['fixture_id','home_ht_goal','away_ht_goal','home_ft_goal','away_ft_goal']]
@@ -60,7 +60,7 @@ def get_goals_fixture_stats(fixtures_master):
     return goals_stats
 
 
-def get_detailed_fixture_stats(focus_source):
+def _get_detailed_fixture_stats(focus_source):
     # load the fixtures stats data
     fixtures_stats_file = os.path.join(_DATA_DIR, focus_source, 'extracted', 'fixtures_stats.csv')
     fixtures_stats = pd.read_csv(fixtures_stats_file, header=0, index_col=False)
@@ -70,7 +70,7 @@ def get_detailed_fixture_stats(focus_source):
     return fixtures_stats
 
 
-def combine_fixture_stats(fixtures_stats, goals_stats, fixtures_master):
+def _combine_fixture_stats(fixtures_stats, goals_stats, fixtures_master):
 
     # combining all the stats
     combo_fix_stats = fixtures_stats.append(goals_stats.loc[:, ['fixture_id', 'fixture_stat', 'home', 'away']])
@@ -88,7 +88,7 @@ def combine_fixture_stats(fixtures_stats, goals_stats, fixtures_master):
     return fixtures_combo
 
 
-def prepare_team_stats(fixtures_combo):
+def _prepare_team_stats(fixtures_combo):
 
     # we are not interested in the home vs away structure anymore as each team
     # is evaluated independently, and then combined at the moment of the model prediction
@@ -109,7 +109,7 @@ def prepare_team_stats(fixtures_combo):
     return team_fixture_stats
 
 
-def compute_fixtures_features(team_fixture_stats, mean_wind, sum_wind, sd_wind):
+def _compute_fixtures_features(team_fixture_stats, mean_wind, sum_wind, sd_wind):
 
     # pre-computation data handling
     team_fixture_stats.sort_values(by = ['league_id','team_id','event_date','fixture_stat'], inplace = True)

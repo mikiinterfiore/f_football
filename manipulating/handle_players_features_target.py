@@ -9,28 +9,30 @@ _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 
-def main():
+def create_pl_features_target(feat_windows):
 
     # unique dataframe from single round-season data
-    gaz_fv = extract_gaz_data()
+    gaz_fv = _extract_gaz_data()
     # work on players master
-    gaz_players = get_players_master(gaz_fv)
+    gaz_players = _get_players_master(gaz_fv)
     # add the correct name-surnames after manual process
-    gaz_players, gaz_fv = clean_players_name(gaz_players, gaz_fv)
+    gaz_players, gaz_fv = _clean_players_name(gaz_players, gaz_fv)
     # work on fantavoti history and players stats
-    mean_wind = [3,7]
-    sum_wind = [3,7]
-    sd_wind = [10]
-    players_features = build_players_features(gaz_fv, mean_wind, sum_wind, sd_wind)
+    mean_wind = feat_windows['mean_wind']
+    sum_wind = feat_windows['sum_wind']
+    sd_wind = feat_windows['sd_wind']
+    players_features = _build_players_features(gaz_fv, mean_wind, sum_wind, sd_wind)
     players_feat_file = os.path.join(_DATA_DIR, 'target_features', 'players_features.csv')
     players_features.to_csv(players_feat_file, header=True, index=False)
     # players fantavoto as model target variable
-    players_target = build_players_target(gaz_fv)
+    players_target = _build_players_target(gaz_fv)
     players_trgt_file = os.path.join(_DATA_DIR, 'target_features', 'players_target.csv')
     players_target.to_csv(players_trgt_file, header=True, index=False)
 
+    return None
 
-def extract_gaz_data():
+
+def _extract_gaz_data():
 
     gaz_fv_files = os.listdir(os.path.join(_DATA_DIR, 'fantavoti'))
     gaz_fv = []
@@ -47,7 +49,7 @@ def extract_gaz_data():
     return gaz_fv
 
 
-def get_players_master(gaz_fv):
+def _get_players_master(gaz_fv):
 
     # collapse the data to players and teams only
     agg_dict = {'season' : [np.min, np.max], 'match' : [np.min, np.max]}
@@ -63,7 +65,7 @@ def get_players_master(gaz_fv):
     return gaz_players
 
 
-def clean_players_name(gaz_players, gaz_fv):
+def _clean_players_name(gaz_players, gaz_fv):
 
     raw_filename = os.path.join(_DATA_DIR, 'master', 'gaz_players_correction.csv')
     manual_filename = os.path.join(_DATA_DIR, 'master', 'gaz_players_correction_manual.csv')
@@ -92,7 +94,7 @@ def clean_players_name(gaz_players, gaz_fv):
     return gaz_players, gaz_fv
 
 
-def build_players_features(gaz_fv, mean_wind, sum_wind, sd_wind):
+def _build_players_features(gaz_fv, mean_wind, sum_wind, sd_wind):
 
     long_gaz_fv = gaz_fv.copy()
     # handling the voto and fantavoto data and re-normalising
@@ -184,7 +186,7 @@ def build_players_features(gaz_fv, mean_wind, sum_wind, sd_wind):
     return players_features
 
 
-def build_season_skeleton(gaz_fv):
+def _build_season_skeleton(gaz_fv):
 
     gaz_all_seasons = []
     for s in sorted(gaz_fv['season'].unique()):
@@ -205,10 +207,10 @@ def build_season_skeleton(gaz_fv):
     return gaz_all_seasons
 
 
-def build_players_target(gaz_fv):
+def _build_players_target(gaz_fv):
 
     # getting all the matches for each player available in that season
-    gaz_all_seasons = build_season_skeleton(gaz_fv)
+    gaz_all_seasons = _build_season_skeleton(gaz_fv)
     # merging the gazzetta marks
     keep_cols = ['name', 'surname','season', 'match', 'team','fantavoto']
 

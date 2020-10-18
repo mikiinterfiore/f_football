@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 
 from utils.utils_features_target_model import get_ffdata_combined
+from utils.utils_setup_model import bin_target_values, assign_label_relative_importance
 
 from scipy import stats
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
@@ -109,30 +110,6 @@ def save_all_data(X_train, X_test, y_train, y_test, target_var):
     X_test.to_csv(os.path.join(_DATA_DIR, 'target_features', 'x_test_dt.csv'), header=True, index=True)
     pd.DataFrame({target_var:y_train}).to_csv(os.path.join(_DATA_DIR, 'target_features', 'y_train_dt.csv'), header=True, index=True)
     pd.DataFrame({target_var:y_test}).to_csv(os.path.join(_DATA_DIR, 'target_features', 'y_test_dt.csv'), header=True, index=True)
-
-
-def assign_label_relative_importance(y_train, y_test, label_encoder):
-
-    y_tot = np.concatenate((y_train, y_test))
-    y_labels_freq = np.unique(y_tot, return_counts=True)
-    # original_labels_freq = dict(zip(label_encoder.classes_,
-    #                                 np.max(y_labels_freq[1])/y_labels_freq[1]))
-    labels_weight_map = dict(zip(label_encoder.classes_,  [50, 25, 10, 1, 10, 25, 50]))
-    encoded_weight_map = dict(zip(y_labels_freq[0], [50, 25, 10, 1, 10, 25, 50]))
-    y_tot = pd.DataFrame({'label' : y_tot})
-    y_tot['weight'] = y_tot['label'].map(encoded_weight_map)
-    scale_weight = y_tot['weight'].copy()
-
-
-    encoded_map = dict(zip(map(str, label_encoder.classes_),
-                           map(int, np.unique(y_tot))))
-    encoded_map_filename = 'xgboost_softmax_label_encoder_20201013.pkl'
-    encoded_map_filename = os.path.join(_DATA_DIR, 'models', encoded_map_filename)
-    # Open the file to save as pkl files
-    with open(encoded_map_filename, 'w') as f:
-        json.dump(encoded_map, f)
-
-    return scale_weight, labels_weight_map
 
 
 def run_grid(X_train, y_train, rng, model_type, full_grid, grid_iter, scale_weight):
