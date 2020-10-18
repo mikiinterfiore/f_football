@@ -1,11 +1,14 @@
 # Fantasy Football meets Statistics
 
-The project combines the fun of playing Fantasy Football with a systematic approach to football data. 
+The project combines the fun of playing Fantasy Football with a analytics and prediction modelling for football data.
 
-The goal is to support each Fantasy Football coach, by enhancing its decision making via an automated pipeline that predictions
-on players and suggestions on lineups.
+The goal is to support each Fantasy Football coach, by helping them to select the best 11 players for the following round line-up.
 
-The repository contains a set of functions to process data related to soccer teams and players. I rely on free external APIs as well as scraping mechanism.
-The project also includes a pipeline to train, test, and deploy a performance prediction model on Fantasy Football players.
+The ranking is done using the expected Fantasy Football points that would be earned the following match.
+This is modelled using a compbination of player-specific and team-specific data.
 
-More to come, stay tuned...
+The repository is strctured in 4 folders:
+- Sourcing : set of functions used to download and scrape data from various sources, save it to disk, and handle specific data structure choices
+- Manipulating : set of functions to combine the downloaded data into master files, team data files, player data files
+- Utils : set of functions used across the board, sourced directly from other scripts
+- Modelling : set of functions to create the data features and targets, train the model, predict, analyse the outcome

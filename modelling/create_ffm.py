@@ -4,9 +4,6 @@ import json
 import pandas as pd
 import numpy as np
 
-from utils.utils_features_target_model import get_ffdata_combined
-from utils.utils_setup_model import bin_target_values, assign_label_relative_importance
-
 from scipy import stats
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 # hyper parameter search
@@ -17,12 +14,19 @@ from sklearn.metrics import accuracy_score
 
 from xgboost import XGBRegressor, XGBClassifier
 
+from utils.utils_features_target_model import get_ffdata_combined
+from utils.utils_setup_model import bin_target_values, assign_label_relative_importance
+
 _BASE_DIR = '/home/costam/Documents'
-# _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 
-def main(model_type='classifier', use_class_scale=True):
+def main(model_type='classifier', use_class_scale=True, full_grid=True, grid_iter=80):
+
+    # model_type='classifier'
+    # use_class_scale=True
+    # full_grid = True
+    # grid_iter = 80
 
     # getting the data
     select_seasons = [2018, 2019, 2020]
@@ -32,13 +36,6 @@ def main(model_type='classifier', use_class_scale=True):
     # preparing the features
     X_train, X_test, y_train, y_test, label_encoder = prepare_model_data(full_dt, rng, model_type)
 
-    # # running the model for regression
-    # gsearch = run_model(X_train, y_train, rng, model_type='regressor', full_grid=False)
-    # regress_pkl_filename = os.path.join(_DATA_DIR, 'models', 'xgboost_nogrid_20201003.pkl')
-    # # Open the file to save as pkl file
-    # with open(regress_pkl_filename, 'wb') as f:
-    #     pickle.dump(gsearch, f)
-
     scale_weight = np.repeat(1, len(y_test) + len(y_train))
     if model_type=='classifier' and use_class_scale:
         scale_weight, labels_weight_map = assign_label_relative_importance(y_train,
@@ -46,11 +43,9 @@ def main(model_type='classifier', use_class_scale=True):
                                                                            label_encoder)
 
     # running the model for multi-label classification
-    full_grid = True
-    grid_iter = 80
     softmax_gsearch = run_grid(X_train, y_train, rng, model_type, full_grid,
                                grid_iter, scale_weight)
-    softmax_pkl_filename = 'xgboost_softmax_gridsearch_20201013.pkl'
+    softmax_pkl_filename = 'xgboost_softmax_gridsearch_20201018.pkl'
     softmax_pkl_filename = os.path.join(_DATA_DIR, 'models', softmax_pkl_filename)
     # Open the file to save as pkl files
     with open(softmax_pkl_filename, 'wb') as f:
@@ -64,7 +59,7 @@ def main(model_type='classifier', use_class_scale=True):
     grid_best_params = softmax_gsearch.best_params_
     validation_out, validated_model = run_model(grid_best_params, X_train, y_train,
                                                 rng, model_type, scale_weight)
-    softmax_validated_filename = 'xgboost_softmax_validated_20201013.pkl'
+    softmax_validated_filename = 'xgboost_softmax_validated_20201018.pkl'
     softmax_validated_filename = os.path.join(_DATA_DIR, 'models', softmax_validated_filename)
     # Open the file to save as pkl files
     with open(softmax_validated_filename, 'wb') as f:

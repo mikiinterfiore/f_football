@@ -16,47 +16,49 @@ import shap
 
 from matplotlib import pyplot as plt
 
+from utils.utils_features_target_model import get_ffdata_combined
+
 _BASE_DIR = '/home/costam/Documents'
 _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 
-def main(model_type='classifier'):
+def main(model_type='classifier', use_class_scale=True):
+
+    # model_type='classifier'
+    # use_class_scale=True
+
+    # loading the specific players for Fantasy Football
+    ff_players_filename = os.path.join(_DATA_DIR, 'master', 'fantacalcio_players.csv')
+    ff_players = pd.read_csv(ff_players_filename, header=0, index_col=None)
 
     # getting the data
-    X_train, y_train, X_test, y_test = get_train_test_data(model_type)
-    if model_type == 'classifier':
-        label_encoder = LabelEncoder()
-        y_tot = pd.concat([y_train, y_test])
-        label_encoder.fit(y_tot['fwd_fv_scaled'])
-        y_train = label_encoder.transform(y_train['fwd_fv_scaled'])
-        y_test = label_encoder.transform(y_test['fwd_fv_scaled'])
+    select_seasons = [2018, 2019, 2020]
+    full_dt = get_ffdata_combined(select_seasons)
+    # players skeleton
+    players_dt = full_dt.loc[:, ['name','surname', 'season','match']]
+    players_dt = players_dt.merge(ff_players, on = ['name', 'surname'], how='left')
+    season_idx = full_dt['season'] == max(select_seasons)
+    ff_players_idx = players_dt.loc[(~players_dt['team'].isna()) & season_idx].index
 
-    # # getting the model trained with regression objective
-    # model_type='regressor'
-    # regress_pkl_filename = os.path.join(_DATA_DIR, 'models', 'xgboost_nogrid_20201003.pkl')
-    # # Open the file to save as pkl file
-    # with open(regress_pkl_filename, 'rb') as f:
-    #     regres_model = pickle.load(f)
+    # creating features data
+    exclude_col = ['name', 'surname', 'season', 'match', 'fwd_fantavoto', 'fwd_fv_scaled', 'role']
+    feat_cols = full_dt.columns.values[~full_dt.columns.isin(exclude_col)].tolist()
+    X = full_dt.loc[ff_players_idx, feat_cols]
 
     # getting the model trained with multiclass objective
-    softmax_pkl_filename = os.path.join(_DATA_DIR, 'models', 'xgboost_softmax_gridsearch_20201012.pkl')
+    softmax_validated_filename = os.path.join(_DATA_DIR, 'models', 'xgboost_softmax_validated_20201018.pkl')
     # Open the file to save as pkl files
-    with open(softmax_pkl_filename, 'rb') as f:
+    with open(softmax_validated_filename, 'rb') as f:
         classi_model =  pickle.load(f)
 
-    # np.unique(y_tot, return_counts=True)
-    # np.unique(y_train, return_counts=True)
+    preds = classi_model.predict(X)
+    preds = pd.DataFrame({'expected_fv_scaled_binned' : preds})
+    preds.index = X.index
 
-    # in sample predictions
-    ins_preds = classi_model.predict(X_train)
-    # np.unique(ins_preds, return_counts=True)
-    ins_prob_preds = classi_model.predict_proba(X_train)
+    pred_fv_dt = players_dt.loc[(~players_dt['team'].isna()) & season_idx]
+    pred_fv_dt = pred_fv_dt.merge(preds, left_index=True, right_index=True)
 
-    # out of sample predictions
-    oos_preds = classi_model.predict(X_test)
-    oos_prob_preds = classi_model.predict_proba(X_test)
-
-    return None
+    return pred_fv_dt
 
 
 def get_train_test_data(model_type):

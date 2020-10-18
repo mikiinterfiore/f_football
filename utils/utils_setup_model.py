@@ -4,6 +4,9 @@ import json
 import pandas as pd
 import numpy as np
 
+_BASE_DIR = '/home/costam/Documents'
+_DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
+
 
 def bin_target_values(v):
 
@@ -26,20 +29,21 @@ def bin_target_values(v):
 
 def assign_label_relative_importance(y_train, y_test, label_encoder):
 
+    relative_imp = [30, 15, 5, 1, 5, 15, 30]
+
     y_tot = np.concatenate((y_train, y_test))
     y_labels_freq = np.unique(y_tot, return_counts=True)
     # original_labels_freq = dict(zip(label_encoder.classes_,
     #                                 np.max(y_labels_freq[1])/y_labels_freq[1]))
-    labels_weight_map = dict(zip(label_encoder.classes_,  [50, 25, 10, 1, 10, 25, 50]))
-    encoded_weight_map = dict(zip(y_labels_freq[0], [50, 25, 10, 1, 10, 25, 50]))
+    labels_weight_map = dict(zip(label_encoder.classes_,  relative_imp))
+    encoded_weight_map = dict(zip(y_labels_freq[0], relative_imp))
     y_tot = pd.DataFrame({'label' : y_tot})
     y_tot['weight'] = y_tot['label'].map(encoded_weight_map)
     scale_weight = y_tot['weight'].copy()
 
-
     encoded_map = dict(zip(map(str, label_encoder.classes_),
                            map(int, np.unique(y_tot))))
-    encoded_map_filename = 'xgboost_softmax_label_encoder_20201013.pkl'
+    encoded_map_filename = 'xgboost_softmax_label_encoder_20201018.pkl'
     encoded_map_filename = os.path.join(_DATA_DIR, 'models', encoded_map_filename)
     # Open the file to save as pkl files
     with open(encoded_map_filename, 'w') as f:
