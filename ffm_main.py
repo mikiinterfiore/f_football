@@ -12,7 +12,7 @@ from manipulating.handle_fixtures import get_updated_fixture_master_stats
 from manipulating.handle_players_features_target import create_pl_features_target
 from manipulating.handle_team_features import create_tm_features
 
-from modelling.predict_ffm import main as fv_model_predict
+from modelling.predict_ffm import get_ffm_predictions
 
 
 def ffm_main():
@@ -49,7 +49,7 @@ def ffm_main():
     create_tm_features(focus_source, feat_windows)
 
     print('Use the stored model to predict next game FV.')
-
+    get_ffm_predictions(final_round=final_round)
 
     return None
 

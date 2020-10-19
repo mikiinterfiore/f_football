@@ -43,7 +43,7 @@ def assign_label_relative_importance(y_train, y_test, label_encoder):
 
     encoded_map = dict(zip(map(str, label_encoder.classes_),
                            map(int, np.unique(y_tot))))
-    encoded_map_filename = 'xgboost_softmax_label_encoder_20201018.pkl'
+    encoded_map_filename = 'xgboost_softmax_label_encoder.pkl'
     encoded_map_filename = os.path.join(_DATA_DIR, 'models', encoded_map_filename)
     # Open the file to save as pkl files
     with open(encoded_map_filename, 'w') as f:

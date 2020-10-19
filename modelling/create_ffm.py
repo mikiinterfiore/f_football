@@ -29,7 +29,7 @@ def main(model_type='classifier', use_class_scale=True, full_grid=True, grid_ite
     # grid_iter = 80
 
     # getting the data
-    select_seasons = [2018, 2019, 2020]
+    select_seasons = [2018, 2019]
     full_dt = get_ffdata_combined(select_seasons)
     # setting the random seed before the split
     rng = np.random.RandomState(1298)
@@ -50,8 +50,8 @@ def main(model_type='classifier', use_class_scale=True, full_grid=True, grid_ite
     # Open the file to save as pkl files
     with open(softmax_pkl_filename, 'wb') as f:
         pickle.dump(softmax_gsearch, f)
-    with open(softmax_pkl_filename, 'rb') as f:
-        softmax_gsearch = pickle.load(f)
+    # with open(softmax_pkl_filename, 'rb') as f:
+    #     softmax_gsearch = pickle.load(f)
 
     # softmax_gsearch = gsearch
     # type_of_target(y_train)

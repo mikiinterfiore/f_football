@@ -40,14 +40,14 @@ def main(model_type='classifier'):
         y_train = label_encoder.transform(y_train['fwd_fv_scaled'])
         y_test = label_encoder.transform(y_test['fwd_fv_scaled'])
         # get the original encoding map
-        encoded_map_filename = 'xgboost_softmax_label_encoder_20201013.pkl'
+        encoded_map_filename = 'xgboost_softmax_label_encoder.pkl'
         encoded_map_filename = os.path.join(_DATA_DIR, 'models', encoded_map_filename)
         # Open the file to save as pkl files
         with open(encoded_map_filename, 'r') as f:
             encoded_map = json.load(f)
 
     # getting the model trained with multiclass objective
-    softmax_validated_filename = os.path.join(_DATA_DIR, 'models', 'xgboost_softmax_validated_20201013.pkl')
+    softmax_validated_filename = os.path.join(_DATA_DIR, 'models', 'xgboost_softmax_validated_20201018.pkl')
     # Open the file to save as pkl files
     with open(softmax_validated_filename, 'rb') as f:
         classi_model =  pickle.load(f)
