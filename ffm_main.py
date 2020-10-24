@@ -28,7 +28,7 @@ def ffm_main():
     })
 
     # from the previous available calendar, find the last league round with data
-    calendar_data = get_updated_calendar(focus_source)    
+    calendar_data = get_updated_calendar(focus_source)
     last_avail_round = _get_last_played_round(calendar_data)
     start_round = (last_avail_round - 2) if last_avail_round >= 3 else 1
     final_round = (last_avail_round + 2) if last_avail_round <= 36 else 39

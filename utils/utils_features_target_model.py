@@ -10,7 +10,7 @@ _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 def get_ffdata_combined(select_seasons):
 
-    # select_seasons = [2018, 2019, 2020]
+    # select_seasons = [2019, 2020]
     print('Loading team and fixtures masters.')
     team_map, fix_master = _get_ffdata_masters()
     print('Loading team and player features.')

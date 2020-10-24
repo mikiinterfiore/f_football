@@ -22,15 +22,16 @@ _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 def get_ffm_predictions(final_round):
 
-    # final_round=4
+    # final_round=6
 
     # loading the specific players for Fantasy Football
     ff_players_filename = os.path.join(_DATA_DIR, 'master', 'fantacalcio_players.csv')
     ff_players = pd.read_csv(ff_players_filename, header=0, index_col=None)
 
     # getting the data
-    select_seasons = [2018, 2019, 2020]
+    select_seasons = [2019, 2020]
     full_dt = get_ffdata_combined(select_seasons)
+
     # players skeleton
     players_dt = full_dt.loc[:, ['name','surname', 'season','match']]
     players_dt = players_dt.merge(ff_players, on = ['name', 'surname'], how='left')
