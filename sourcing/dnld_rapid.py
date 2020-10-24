@@ -20,12 +20,13 @@ _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 
 def dnld_rapid_data(focus_source, season, start_round, final_round, overwrite=False):
 
-    # focus_source = 'rapid_football'
-    # season = 2020
-    # last_avail_round = 3
-    # start_round = (last_avail_round - 2) if last_avail_round >= 3 else 1
-    # final_round = (last_avail_round + 2) if last_avail_round <= 36 else 39
-    # overwrite = True
+    focus_source = 'rapid_football'
+    season = 2020
+    last_avail_round = 3
+    start_round = (last_avail_round - 2) if last_avail_round >= 3 else 1
+    final_round = (last_avail_round + 2) if last_avail_round <= 36 else 39
+    overwrite = True
+
     api_key = get_api_creds(focus_source)
     req_headers = dict({'X-RapidAPI-Key' : api_key,
                         'X-RapidAPI-host' : 'api-football-v1.p.rapidapi.com'})
@@ -64,7 +65,9 @@ def dnld_rapid_data(focus_source, season, start_round, final_round, overwrite=Fa
                                                                        search_params,
                                                                        search_type,
                                                                        search_target,
-                                                                       False)
+                                                                       overwrite)
+    print("API calls after completing team fixtures : %i" % day_num_request)
+
     # looking for the fixtures in every round
     # overwriting all the games in the last two rounds and all the games if __name__ == '__main__':
     # the next two rounds
@@ -83,8 +86,7 @@ def dnld_rapid_data(focus_source, season, start_round, final_round, overwrite=Fa
                                                             search_params,
                                                             search_type,
                                                             search_target,
-                                                            False)
-                                                            # overwrite)
+                                                            overwrite)
     print("API calls after completing calendar : %i" % day_num_request)
 
     # get all statistics for a fixture_id
@@ -116,6 +118,6 @@ def dnld_rapid_data(focus_source, season, start_round, final_round, overwrite=Fa
                                                                                 search_target,
                                                                                 overwrite)
 
-    print("API calls after completing fixtures data: %i" % day_num_request)
+    print("API calls after completing fixtures stats data: %i" % day_num_request)
 
     return None

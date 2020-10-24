@@ -50,6 +50,7 @@ def wrap_api_request(day_num_request, focus_source, req_headers, search_params,
     else:
         with open(os.path.join(out_dir, filename), 'r') as inputfile:
             data = json.load(inputfile)
+            
     return data, day_num_request
 
 
@@ -176,6 +177,7 @@ def add_fixture_data(fixtures_master, sf):
     # 'event_date' : dt.datetime.strptime(sf['event_date'],'%Y-%m-%dT%H:%M:S+%z'),
     'event_date' : pd.to_datetime(sf['event_timestamp'], unit='s'),
     'referee' : sf['referee'],
+    'statusShort' : sf['statusShort'],
     'home_team_id' : int(sf['homeTeam']['team_id']),
     'home_team_name' : sf['homeTeam']['team_name'],
     'away_team_id' : int(sf['awayTeam']['team_id']),
@@ -183,12 +185,15 @@ def add_fixture_data(fixtures_master, sf):
     }
 
     if sf['status'] == 'Match Finished':
+        if sf['score']['halftime'] is None:
+            print(sf['fixture_id'])
+            sf['score']['halftime'] = '0-0'
         new_row['home_ht_goal'] = int(sf['score']['halftime'].split('-')[0])
         new_row['away_ht_goal'] = int(sf['score']['halftime'].split('-')[1])
         new_row['home_ft_goal'] = int(sf['goalsHomeTeam'])
         new_row['away_ft_goal'] = int(sf['goalsAwayTeam'])
     else:
-        print(sf['status'])
+        # print(sf['status'])
         new_row['home_ht_goal'] = None
         new_row['away_ht_goal'] = None
         new_row['home_ft_goal'] = None
@@ -204,6 +209,7 @@ def get_fixture_master(focus_source, master_file):
     # creating the file master if not available
     if not os.path.isfile(master_file):
         fix_master_cols = ['fixture_id', 'league_id', 'event_date', 'referee',
+                           'statusShort',
                            'home_team_id', 'away_team_id', 'home_team_name',
                            'away_team_name', 'home_ht_goal', 'away_ht_goal',
                            'home_ft_goal', 'away_ft_goal']
@@ -222,11 +228,13 @@ def update_fixture_master(fixtures_master, fixture_dir):
         with open(os.path.join(fixture_dir, tf), 'r') as inputfile:
             raw_data = json.load(inputfile)
         for sf in raw_data:
-            if sf['fixture_id'] not in fixtures_master['fixture_id'].unique():
-                fixtures_master = add_fixture_data(fixtures_master, sf)
+            fixtures_master = add_fixture_data(fixtures_master, sf)
 
     # correctly setting the date and time
     fixtures_master['event_date'] = pd.to_datetime(fixtures_master['event_date'], utc=True)
     fixtures_master = fixtures_master.set_index('event_date', drop=True).tz_convert('Europe/London').reset_index()
+    print(fixtures_master.loc[fixtures_master['referee'].isna()])
+    keep_idx = fixtures_master['statusShort'] == 'FT'
+    fixtures_master = fixtures_master.loc[keep_idx].drop_duplicates()
 
     return fixtures_master

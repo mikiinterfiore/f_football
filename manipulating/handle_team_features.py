@@ -22,7 +22,7 @@ def create_tm_features(focus_source, feat_windows):
     sum_wind = feat_windows['sum_wind']
     sd_wind = feat_windows['sd_wind']
     team_fixture_features = _compute_fixtures_features(team_fixture_stats, mean_wind,
-                                                      sum_wind, sd_wind)
+                                                       sum_wind, sd_wind)
     # adding the correct information about the round to each fixture
     calendar_file = os.path.join(_DATA_DIR, focus_source, 'masters', 'calendar_master.csv')
     calendar_data = pd.read_csv(calendar_file, header=0, index_col=False)
@@ -84,6 +84,7 @@ def _combine_fixture_stats(fixtures_stats, goals_stats, fixtures_master):
                        'fixture_stat', 'home', 'away']
     df_order = ['event_date', 'fixture_id', 'home_team_id', 'fixture_stat']
     fixtures_combo = fixtures_combo.loc[:, stats_col_order].reset_index(drop=True).sort_values(by=df_order)
+    fixtures_combo = fixtures_combo.drop_duplicates()
 
     return fixtures_combo
 
@@ -112,8 +113,15 @@ def _prepare_team_stats(fixtures_combo):
 def _compute_fixtures_features(team_fixture_stats, mean_wind, sum_wind, sd_wind):
 
     # pre-computation data handling
-    team_fixture_stats.sort_values(by = ['league_id','team_id','event_date','fixture_stat'], inplace = True)
+    tm_ft_ord = ['league_id','team_id', 'event_date', 'fixture_id', 'fixture_stat']
+    team_fixture_stats = team_fixture_stats.drop_duplicates().sort_values(by = tm_ft_ord)
+    team_fixture_stats = team_fixture_stats.loc[team_fixture_stats['event_date'] <= pd.Timestamp.now(), :]
+    team_fixture_stats = team_fixture_stats.reset_index(drop=True)
     team_fixture_stats['val'] = team_fixture_stats['val'].fillna(0)
+
+    # error_idx = [608517, 608511, 608511, 608516, 608517, 608516]
+    # team_fixture_stats.loc[team_fixture_stats['fixture_id'].isin(error_idx)]
+    # # team_fixture_stats = team_fixture_stats.loc[team_fixture_stats['team_name']=='Inter', ]
 
     # rolling calculations for all the statistics except the goals
     stats_idx  = ~team_fixture_stats['fixture_stat'].isin(['ht_goal', 'ft_goal'])
@@ -159,7 +167,12 @@ def _compute_fixtures_features(team_fixture_stats, mean_wind, sum_wind, sd_wind)
                                                         left_index=True,
                                                         right_index=True)
     pivot_idx = ['team_id', 'team_name', 'event_date', 'fxtr_feature', 'fixture_id', 'league_id']
-    team_fixture_features = team_fixture_features.sort_values(by=pivot_idx)
+    team_fixture_features = team_fixture_features.sort_values(by=pivot_idx).drop_duplicates()
+
+    # team_fixture_features['obs_cnt'] = team_fixture_features.groupby(pivot_idx)['val'].transform('count')
+    # team_fixture_features['obs_cnt'].value_counts()
+    # team_fixture_features.loc[team_fixture_features['obs_cnt'] >1, ['team_name', 'fixture_id', 'event_date']].drop_duplicates()
+
     team_fixture_features = team_fixture_features.set_index(pivot_idx).unstack('fxtr_feature').reset_index()
     # flattening out the column index
     higher_levels = team_fixture_features.columns.get_level_values(0)

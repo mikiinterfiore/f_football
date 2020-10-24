@@ -53,4 +53,4 @@ def _update_calendar(calendar_data, focus_source):
     calendar_data['event_date'] = pd.to_datetime(calendar_data['event_date'], utc=True)
     calendar_data = calendar_data.set_index('event_date', drop=True).tz_convert('Europe/London').reset_index()
 
-    return calendar_data
+    return calendar_data.drop_duplicates()
