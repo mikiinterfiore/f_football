@@ -29,7 +29,7 @@ def main(model_type='classifier', use_class_scale=True, full_grid=True, grid_ite
     # grid_iter = 80
 
     # getting the data
-    select_seasons = [2018, 2019]
+    select_seasons = [2018, 2019, 2020]
     full_dt = get_ffdata_combined(select_seasons)
     # setting the random seed before the split
     rng = np.random.RandomState(1298)

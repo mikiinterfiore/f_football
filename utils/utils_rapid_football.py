@@ -50,7 +50,7 @@ def wrap_api_request(day_num_request, focus_source, req_headers, search_params,
     else:
         with open(os.path.join(out_dir, filename), 'r') as inputfile:
             data = json.load(inputfile)
-            
+
     return data, day_num_request
 
 
@@ -176,7 +176,7 @@ def add_fixture_data(fixtures_master, sf):
     'league_id' : int(sf['league_id']),
     # 'event_date' : dt.datetime.strptime(sf['event_date'],'%Y-%m-%dT%H:%M:S+%z'),
     'event_date' : pd.to_datetime(sf['event_timestamp'], unit='s'),
-    'referee' : sf['referee'],
+    # 'referee' : sf['referee'],
     'statusShort' : sf['statusShort'],
     'home_team_id' : int(sf['homeTeam']['team_id']),
     'home_team_name' : sf['homeTeam']['team_name'],
@@ -208,7 +208,7 @@ def get_fixture_master(focus_source, master_file):
 
     # creating the file master if not available
     if not os.path.isfile(master_file):
-        fix_master_cols = ['fixture_id', 'league_id', 'event_date', 'referee',
+        fix_master_cols = ['fixture_id', 'league_id', 'event_date', #'referee',
                            'statusShort',
                            'home_team_id', 'away_team_id', 'home_team_name',
                            'away_team_name', 'home_ht_goal', 'away_ht_goal',
@@ -233,7 +233,7 @@ def update_fixture_master(fixtures_master, fixture_dir):
     # correctly setting the date and time
     fixtures_master['event_date'] = pd.to_datetime(fixtures_master['event_date'], utc=True)
     fixtures_master = fixtures_master.set_index('event_date', drop=True).tz_convert('Europe/London').reset_index()
-    print(fixtures_master.loc[fixtures_master['referee'].isna()])
+    # print(fixtures_master.loc[fixtures_master['referee'].isna()])
     keep_idx = fixtures_master['statusShort'] == 'FT'
     fixtures_master = fixtures_master.loc[keep_idx].drop_duplicates()
 

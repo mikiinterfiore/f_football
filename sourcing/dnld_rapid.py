@@ -20,12 +20,12 @@ _CODE_DIR = os.path.join(_BASE_DIR, 'fantacalcio/fanta_code')
 
 def dnld_rapid_data(focus_source, season, start_round, final_round, overwrite=False):
 
-    focus_source = 'rapid_football'
-    season = 2020
-    last_avail_round = 3
-    start_round = (last_avail_round - 2) if last_avail_round >= 3 else 1
-    final_round = (last_avail_round + 2) if last_avail_round <= 36 else 39
-    overwrite = True
+    # focus_source = 'rapid_football'
+    # season = 2020
+    # last_avail_round = 3
+    # start_round = (last_avail_round - 2) if last_avail_round >= 3 else 1
+    # final_round = (last_avail_round + 2) if last_avail_round <= 36 else 39
+    # overwrite = True
 
     api_key = get_api_creds(focus_source)
     req_headers = dict({'X-RapidAPI-Key' : api_key,
