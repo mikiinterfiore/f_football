@@ -10,7 +10,7 @@ _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 def get_ffdata_combined(select_seasons):
 
-    # select_seasons = [2019, 2020]
+    # select_seasons = [2018, 2019, 2020]
     print('Loading team and fixtures masters.')
     team_map, fix_master = _get_ffdata_masters()
     print('Loading team and player features.')
@@ -190,9 +190,9 @@ def _combine_ffdata(team_map, fix_master, tm_feat, pl_feat, pl_fv, select_season
         full_dt.reset_index(inplace=True, drop=True)
 
     full_dt['role'] = full_dt['role'].astype('category')
-
-    # print(full_dt.columns.values)
-    # len(full_dt.columns.values)
+    role_dummy = pd.get_dummies(full_dt['role'])
+    full_dt = pd.concat([full_dt, role_dummy], axis = 1)
+    # full_dt = full_dt.drop('role', axis=1)
 
     return full_dt
 
