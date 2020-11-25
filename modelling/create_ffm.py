@@ -53,9 +53,6 @@ def main(model_type='classifier', use_class_scale=True, full_grid=True, grid_ite
     # with open(softmax_pkl_filename, 'rb') as f:
     #     softmax_gsearch = pickle.load(f)
 
-    # softmax_gsearch = gsearch
-    # type_of_target(y_train)
-    # type_of_target(y_test)
     grid_best_params = softmax_gsearch.best_params_
     validation_out, validated_model = run_model(grid_best_params, X_train, y_train,
                                                 rng, model_type, scale_weight)

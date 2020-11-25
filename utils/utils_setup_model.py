@@ -29,7 +29,8 @@ def bin_target_values(v):
 
 def assign_label_relative_importance(y_train, y_test, label_encoder):
 
-    relative_imp = [30, 15, 5, 1, 5, 15, 30]
+    # relative_imp = [30, 15, 5, 1, 5, 15, 30] # changed on 23/11/2020
+    relative_imp = [5, 4, 3, 1, 3, 4, 5]
 
     y_tot = np.concatenate((y_train, y_test))
     y_labels_freq = np.unique(y_tot, return_counts=True)
