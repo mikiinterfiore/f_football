@@ -9,12 +9,19 @@ _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 def create_tm_features(focus_source, feat_windows):
 
+    # focus_source = 'rapid_football'
+    # feat_windows = dict({
+    #     'mean_wind' : [3,7],
+    #     'sum_wind' : [3,7],
+    #     'sd_wind' : [10]
+    # })
+
     # load the fixtures master
     master_file = os.path.join(_DATA_DIR, focus_source, 'masters', 'fixture_master.csv')
     fixtures_master = pd.read_csv(master_file, header=0, index_col=False)
     goals_stats = _get_goals_fixture_stats(fixtures_master)
     fixtures_stats = _get_detailed_fixture_stats(focus_source)
-    assists = fixtures_stats.loc[fixtures_stats['fixture_stat'] == 'Assists', :]
+
     # RAW DATA FOR EACH TEAM
     fixtures_combo = _combine_fixture_stats(fixtures_stats, goals_stats, fixtures_master)
     team_fixture_stats = _prepare_team_stats(fixtures_combo)
@@ -38,6 +45,7 @@ def create_tm_features(focus_source, feat_windows):
     # inter.to_csv(inter_feat_file, header=True, index=False)
 
     return None
+
 
 def _get_goals_fixture_stats(fixtures_master):
 
@@ -66,6 +74,15 @@ def _get_detailed_fixture_stats(focus_source):
     fixtures_stats = pd.read_csv(fixtures_stats_file, header=0, index_col=False)
     fixtures_stats['home'] = fixtures_stats['home'].str.replace('%', '').astype('float')
     fixtures_stats['away'] = fixtures_stats['away'].str.replace('%', '').astype('float')
+
+    # deduplicate if the stats get amended later on in the week
+    fixtures_stats['dups'] = fixtures_stats.groupby(['fixture_id', 'fixture_stat'])['home'].transform('count')
+    dups_idx = fixtures_stats['dups'] >1
+    dups = fixtures_stats.loc[dups_idx, :]
+    dups = dups.groupby(['fixture_id', 'fixture_stat']).agg({'home' : max, 'away' : max}).reset_index(drop=False)
+    nodups = fixtures_stats.loc[~dups_idx, ['fixture_id', 'fixture_stat', 'home', 'away']]
+
+    fixtures_stats = pd.concat([nodups,dups], axis=0).sort_values(['fixture_id', 'fixture_stat']).reset_index(drop=True)
 
     return fixtures_stats
 

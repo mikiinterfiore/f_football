@@ -15,6 +15,10 @@ def get_updated_calendar(focus_source = 'rapid_football'):
     # loading the previously built master for all matches (fixtures)
     calendar_file = os.path.join(_DATA_DIR, focus_source, 'masters', 'calendar_master.csv')
     calendar_data = _get_fixture_calendar(calendar_file)
+    # fix duplicates
+    calendar_data['dups'] = calendar_data.groupby(['fixture_id', 'league_id'])['status'].transform('count')
+    drop_idx = (calendar_data['dups'] >1) & (calendar_data['statusShort'] == 'NS')
+    calendar_data = calendar_data.loc[~drop_idx,:].drop(['dups'], axis=1)
     calendar_data = _update_calendar(calendar_data, focus_source)
     calendar_data.to_csv(calendar_file, header=True, index=False)
 

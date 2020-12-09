@@ -5,15 +5,7 @@ import pandas as pd
 import numpy as np
 
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-# # for Regression
-# from sklearn.metrics import mean_squared_error, explained_variance_score, median_absolute_error
-# # for multi-class classification
-# from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score
-# from sklearn.metrics import balanced_accuracy_score, confusion_matrix, hinge_loss, matthews_corrcoef, roc_auc_score
-# from sklearn.metrics import classification_report
-
 from xgboost import XGBRegressor, XGBClassifier
-
 from utils.utils_features_target_model import get_ffdata_combined
 
 _BASE_DIR = '/home/costam/Documents'
