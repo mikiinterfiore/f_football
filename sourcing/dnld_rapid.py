@@ -77,7 +77,7 @@ def dnld_rapid_data(focus_source, season, start_round, final_round, overwrite=Fa
         search_type = 'league_round'
         search_target = None
         # 30 requests max / minute
-        time.sleep(random.randint(3, 4))
+        time.sleep(random.randint(4,5))
         if day_num_request >= 100:
             break
         calendar[round], day_num_request = wrap_api_request(day_num_request,
@@ -103,7 +103,7 @@ def dnld_rapid_data(focus_source, season, start_round, final_round, overwrite=Fa
         stats_fixt[round] = dict()
         for game in calendar[round]:
             # 30 requests max / minute
-            time.sleep(random.randint(3, 4))
+            time.sleep(random.randint(4, 5))
             fixture_focus = game['fixture_id']
             search_params = dict({'fixture_id' : fixture_focus})
             search_type = 'statistics_fixture'
