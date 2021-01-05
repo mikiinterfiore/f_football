@@ -36,7 +36,9 @@ def get_ffm_predictions(final_round):
     X = full_dt.loc[ff_players_idx, feat_cols]
 
     # getting the model trained with multiclass objective
-    softmax_validated_filename = os.path.join(_DATA_DIR, 'models', 'xgboost_softmax_validated_20201018.pkl')
+    # softmax_validated_filename = 'xgboost_softmax_validated_20201018.pkl'
+    softmax_validated_filename = 'xgboost_softmax_validated_20210101.pkl'
+    softmax_validated_filename = os.path.join(_DATA_DIR, 'models', softmax_validated_filename)
     # Open the file to save as pkl files
     with open(softmax_validated_filename, 'rb') as f:
         classi_model =  pickle.load(f)

@@ -31,6 +31,8 @@ def main(model_type='classifier', use_class_scale=True, full_grid=True, grid_ite
     # getting the data
     select_seasons = [2018, 2019, 2020]
     full_dt = get_ffdata_combined(select_seasons)
+    print("Dropping the observations with NA fantavoto!")
+    full_dt = full_dt.loc[~full_dt["fwd_fantavoto"].isna()]
     # setting the random seed before the split
     rng = np.random.RandomState(1298)
     # preparing the features
@@ -45,7 +47,8 @@ def main(model_type='classifier', use_class_scale=True, full_grid=True, grid_ite
     # running the model for multi-label classification
     softmax_gsearch = run_grid(X_train, y_train, rng, model_type, full_grid,
                                grid_iter, scale_weight)
-    softmax_pkl_filename = 'xgboost_softmax_gridsearch_20201018.pkl'
+    # softmax_pkl_filename = 'xgboost_softmax_gridsearch_20201018.pkl'
+    softmax_pkl_filename = 'xgboost_softmax_gridsearch_20210101.pkl'
     softmax_pkl_filename = os.path.join(_DATA_DIR, 'models', softmax_pkl_filename)
     # Open the file to save as pkl files
     with open(softmax_pkl_filename, 'wb') as f:
@@ -56,7 +59,8 @@ def main(model_type='classifier', use_class_scale=True, full_grid=True, grid_ite
     grid_best_params = softmax_gsearch.best_params_
     validation_out, validated_model = run_model(grid_best_params, X_train, y_train,
                                                 rng, model_type, scale_weight)
-    softmax_validated_filename = 'xgboost_softmax_validated_20201018.pkl'
+    # softmax_validated_filename = 'xgboost_softmax_validated_20201018.pkl'
+    softmax_validated_filename = 'xgboost_softmax_validated_20210101.pkl'
     softmax_validated_filename = os.path.join(_DATA_DIR, 'models', softmax_validated_filename)
     # Open the file to save as pkl files
     with open(softmax_validated_filename, 'wb') as f:
@@ -253,14 +257,5 @@ def run_model(grid_best_params, X_train, y_train, rng, model_type, scale_weight)
     # Fit the final model
     ins_scale_weight = scale_weight[0:len(y_train)]
     validated_model = model.fit(X_train, y_train, sample_weight=ins_scale_weight)
-
-    # accuracy_model = []
-    # for k, (train, test) in enumerate(fold5_cv.split(X_train, y_train)):
-    #     train_idx = X_train.index.isin(train)
-    #     single_fold = model.fit(X_train[train_idx], y_train[train_idx])
-    #     accuracy_model.append(accuracy_score(y_train[train_idx],
-    #                                          single_fold.predict(X_train[train_idx]),
-    #                                          average=None)*100)
-
 
     return validation_out, validated_model

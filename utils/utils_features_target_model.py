@@ -58,17 +58,16 @@ def _get_ffdata_targets():
     pl_fv_file = os.path.join(_DATA_DIR, 'target_features', 'players_target.csv')
     pl_fv = pd.read_csv(pl_fv_file, header=0, index_col=False)
     pl_fv = pl_fv.sort_values(['name', 'surname', 'season', 'match'])
-    # filling the fv with 6 if they have not played and centering fv on 6
-    pl_fv['fwd_fv_scaled'] = pl_fv['fwd_fantavoto'].fillna(6.0) - 6
+
+    print("Not filling the fantavoto for players missing the game! Left NA")
+    # # filling the fv with 6 if they have not played and centering fv on 6
+    # pl_fv['fwd_fv_scaled'] = pl_fv['fwd_fantavoto'].fillna(6.0) - 6
+    pl_fv['fwd_fv_scaled'] = pl_fv['fwd_fantavoto'] - 6
 
     return pl_fv.drop_duplicates()
 
 
 def _combine_ffdata(team_map, fix_master, tm_feat, pl_feat, pl_fv, select_seasons):
-
-    tm_dim = tm_feat.shape
-    tm_counts = tm_feat.groupby('league_id')['match'].value_counts()
-    pl_dim = pl_feat.shape
 
     # drop observations for games that have not happened yet / data has not been downloaded
     next_round_end = pd.Timestamp.today(tz='Europe/London') + pd.Timedelta(5, 'days')
@@ -103,17 +102,6 @@ def _combine_ffdata(team_map, fix_master, tm_feat, pl_feat, pl_fv, select_season
                             left_on=['team_id','season','match'],
                             right_on=['core_team_id','season','match'],
                             how='left')
-
-    # # core team is home team
-    # core_home_idx = tm_feat['team_id'] == tm_feat['home_team_id']
-    # tm_feat.loc[core_home_idx, 'opponent_name'] = tm_feat.loc[core_home_idx,'away_team_name']
-    # tm_feat.loc[core_home_idx, 'opponent_id'] = tm_feat.loc[core_home_idx,'away_team_id']
-    # # core team is away team
-    # core_away_idx = tm_feat['team_id'] == tm_feat['away_team_id']
-    # # core_away_ft = tm_feat.loc[core_away_idx,:].copy()
-    # tm_feat.loc[core_away_idx, 'opponent_name'] = tm_feat.loc[core_away_idx,'home_team_name']
-    # tm_feat.loc[core_away_idx, 'opponent_id'] = tm_feat.loc[core_away_idx,'home_team_id']
-    # tm_feat.drop(['away_team_name','home_team_name', 'home_team_id', 'away_team_id'], axis=1, inplace=True)
 
     drop_cols = ['home_team_name', 'away_team_name', 'home_team_id', 'away_team_id' ,'core_team_id']
     tm_feat = tm_feat.rename(columns={'next_opponent':'opponent_id'}).drop(drop_cols, axis=1)
@@ -167,7 +155,6 @@ def _combine_ffdata(team_map, fix_master, tm_feat, pl_feat, pl_fv, select_season
     full_dt.loc[:, oppo_tm_cols] = full_dt.groupby(tm_pivot[0:2])[oppo_tm_cols].fillna(method='ffill')
 
     # cleaning up the features data
-    full_dt.columns.values
     drop_cols = ['team_id', 'opponent_id', 'team', 'team_name', 'event_date', 'fixture_id', 'league_id']
     full_dt.drop(drop_cols, axis=1, inplace=True)
     main_cols = ['name', 'surname', 'season', 'match', 'role']
@@ -177,7 +164,8 @@ def _combine_ffdata(team_map, fix_master, tm_feat, pl_feat, pl_fv, select_season
     # dropping the features that have not enough data
     feat_na_check = full_dt.isna().sum()/full_dt.shape[0]
     feat_na_check = feat_na_check[feat_na_check>0.25]
-    feat_na_check = feat_na_check.index.values[feat_na_check.index.values != 'fwd_fantavoto']
+    voto_cols = ['fwd_fantavoto', 'fwd_fv_scaled']
+    feat_na_check = feat_na_check.index.values[~feat_na_check.index.isin(voto_cols)]
     if len(feat_na_check)>0:
         print(feat_na_check)
         full_dt.drop(feat_na_check, axis=1, inplace=True)
@@ -192,7 +180,6 @@ def _combine_ffdata(team_map, fix_master, tm_feat, pl_feat, pl_fv, select_season
     full_dt['role'] = full_dt['role'].astype('category')
     role_dummy = pd.get_dummies(full_dt['role'])
     full_dt = pd.concat([full_dt, role_dummy], axis = 1)
-    # full_dt = full_dt.drop('role', axis=1)
 
     return full_dt
 
