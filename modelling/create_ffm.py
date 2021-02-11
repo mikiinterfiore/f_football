@@ -23,10 +23,10 @@ _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 
 def main(model_type='classifier', use_class_scale=True, full_grid=True, grid_iter=80):
 
-    # model_type='classifier'
-    # use_class_scale=True
-    # full_grid = True
-    # grid_iter = 80
+    model_type='classifier'
+    use_class_scale=True
+    full_grid = False
+    grid_iter = 80
 
     # getting the data
     select_seasons = [2018, 2019, 2020]

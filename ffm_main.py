@@ -69,5 +69,5 @@ def _get_last_played_round(calendar_data):
 
     return last_avail_round
 
-# if __name__ == "__main__":
-#     ffm_main()
+if __name__ == "__main__":
+    ffm_main()
