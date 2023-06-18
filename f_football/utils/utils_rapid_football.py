@@ -6,7 +6,7 @@ import random
 import time
 import pandas as pd
 
-_BASE_DIR = '/home/costam/Documents'
+_BASE_DIR = '/home/costam92/Documents'
 _DATA_DIR = os.path.join(_BASE_DIR, 'fantacalcio/data')
 _KEYS_DIR = os.path.join(_BASE_DIR, 'api_keys')
 _PROVIDERS = dict({'football_data' : 'http://api.football-data.org/v2/',
